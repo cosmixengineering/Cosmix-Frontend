@@ -1,0 +1,14 @@
+:root {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  color: #20242d;
+  background: #f6f7f9;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --color-brand: #242b5f;
+  --color-surface: #ffffff;
+  --color-border: #e4e7ec;
+  --color-muted: #68707e;
+  --color-focus: #127866;
+  --radius: 6px;
+}
