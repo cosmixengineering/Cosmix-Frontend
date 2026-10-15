@@ -93,16 +93,12 @@ export function AttendanceProcessingPage() {
 
   // 2. Real Backend Queries for Live Data
   const sitesQuery = useHrQuery('sites?pageSize=50', pageOf(masterSchema), ['hr.sites.read']);
-  const deptsQuery = useHrQuery(
-    'departments?pageSize=50',
-    pageOf(masterSchema),
-    ['hr.organization.read'],
-  );
-  const employeesQuery = useHrQuery(
-    'employees?pageSize=100',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const deptsQuery = useHrQuery('departments?pageSize=50', pageOf(masterSchema), [
+    'hr.organization.read',
+  ]);
+  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
   const shiftsQuery = useAttendanceQuery(
     '/hr/shifts?pageSize=50',
     shiftPage,
@@ -147,11 +143,11 @@ export function AttendanceProcessingPage() {
       // Dynamically assign site, department, and shift from live collections
       const siteName =
         sitesList.length > 0
-          ? sitesList[index % sitesList.length]?.name ?? 'Head Office'
+          ? (sitesList[index % sitesList.length]?.name ?? 'Head Office')
           : 'Head Office';
       const deptName =
         deptsList.length > 0
-          ? deptsList[index % deptsList.length]?.name ?? 'Operations'
+          ? (deptsList[index % deptsList.length]?.name ?? 'Operations')
           : 'Operations';
       const shiftObj = shiftsList.length > 0 ? shiftsList[index % shiftsList.length] : null;
       const shiftTitle =
@@ -298,8 +294,7 @@ export function AttendanceProcessingPage() {
     totalEmployeesCount > 0 ? Math.round((presentCount / totalEmployeesCount) * 100) : 0;
 
   const lateCount = useMemo(() => records.filter((r) => r.exception === 'late').length, [records]);
-  const latePct =
-    totalEmployeesCount > 0 ? Math.round((lateCount / totalEmployeesCount) * 100) : 0;
+  const latePct = totalEmployeesCount > 0 ? Math.round((lateCount / totalEmployeesCount) * 100) : 0;
 
   const onLeaveCount = useMemo(() => {
     const queueLeaves = leavesQuery.data?.totalCount;
@@ -313,9 +308,8 @@ export function AttendanceProcessingPage() {
 
   const absentCount = useMemo(
     () =>
-      records.filter(
-        (r) => r.checkIn === null && !r.shiftTitle.toLowerCase().includes('leave'),
-      ).length,
+      records.filter((r) => r.checkIn === null && !r.shiftTitle.toLowerCase().includes('leave'))
+        .length,
     [records],
   );
   const absentPct =
@@ -333,9 +327,8 @@ export function AttendanceProcessingPage() {
 
   const outOfGeofenceCount = useMemo(
     () =>
-      records.filter(
-        (r) => r.geofenceStatus === 'out_of_range' || r.exception === 'geofence',
-      ).length,
+      records.filter((r) => r.geofenceStatus === 'out_of_range' || r.exception === 'geofence')
+        .length,
     [records],
   );
 
@@ -418,9 +411,7 @@ export function AttendanceProcessingPage() {
   };
 
   const toggleSelectRow = (id: string) => {
-    setSelectedRows((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const formattedDisplayDate = useMemo(() => {
@@ -945,10 +936,7 @@ export function AttendanceProcessingPage() {
                           style={{ cursor: 'pointer' }}
                           onClick={() => navigate(`/hr/attendance/employees/${row.employeeId}`)}
                         >
-                          <div
-                            className="att-avatar"
-                            style={{ backgroundColor: row.avatarColor }}
-                          >
+                          <div className="att-avatar" style={{ backgroundColor: row.avatarColor }}>
                             {initials}
                           </div>
                           <div className="att-emp-info">
@@ -1086,9 +1074,7 @@ export function AttendanceProcessingPage() {
               <ChevronLeft size={13} />
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(
-                (pg) => pg === 1 || pg === totalPages || Math.abs(pg - currentPageSafe) <= 1,
-              )
+              .filter((pg) => pg === 1 || pg === totalPages || Math.abs(pg - currentPageSafe) <= 1)
               .map((pg, idx, arr) => (
                 <span key={pg} style={{ display: 'inline-flex', alignItems: 'center' }}>
                   {idx > 0 && pg - (arr[idx - 1] ?? 0) > 1 && (

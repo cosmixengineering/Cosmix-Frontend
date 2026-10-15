@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Primitive from '@radix-ui/react-dialog';
-import {
-  Building2,
-  Check,
-  ChevronDown,
-  Shield,
-  Wrench,
-  X,
-} from 'lucide-react';
+import { Building2, Check, ChevronDown, Shield, Wrench, X } from 'lucide-react';
 import { useHrLifetime } from '../../hooks/use-hr-lifetime';
 import { useHrQuery } from '../../hooks/use-hr-queries';
 import { hrWrite } from '../../api/hr-api';
@@ -58,11 +51,9 @@ export function CreateWorksiteModal({ onClose, onSaved }: CreateWorksiteModalPro
   const cache = useQueryClient();
 
   // Queries for active Pakistani cities and approved supervisors
-  const citiesQuery = useHrQuery(
-    'cities?page=1&pageSize=30&isActive=true',
-    pageOf(masterSchema),
-    ['hr.organization.read'],
-  );
+  const citiesQuery = useHrQuery('cities?page=1&pageSize=30&isActive=true', pageOf(masterSchema), [
+    'hr.organization.read',
+  ]);
 
   const employeesQuery = useHrQuery(
     'employees?page=1&pageSize=50&status=2',
@@ -70,11 +61,7 @@ export function CreateWorksiteModal({ onClose, onSaved }: CreateWorksiteModalPro
     ['hr.employees.read'],
   );
 
-  const shiftsQuery = useAttendanceQuery(
-    '/hr/shifts?pageSize=50&isActive=true',
-    shiftPage,
-    true,
-  );
+  const shiftsQuery = useAttendanceQuery('/hr/shifts?pageSize=50&isActive=true', shiftPage, true);
 
   // Form state matching Image 3 mockup
   const [siteName, setSiteName] = useState('');
@@ -303,7 +290,11 @@ export function CreateWorksiteModal({ onClose, onSaved }: CreateWorksiteModalPro
           </div>
 
           {errorMessage && (
-            <div role="alert" className="hr-message hr-message--error" style={{ margin: '14px 0 6px' }}>
+            <div
+              role="alert"
+              className="hr-message hr-message--error"
+              style={{ margin: '14px 0 6px' }}
+            >
               {errorMessage}
             </div>
           )}
@@ -455,9 +446,7 @@ export function CreateWorksiteModal({ onClose, onSaved }: CreateWorksiteModalPro
                   </div>
 
                   <div className="form-group">
-                    <label className="worksite-label">
-                      Assigned Operational Shift
-                    </label>
+                    <label className="worksite-label">Assigned Operational Shift</label>
                     <div className="select-wrapper">
                       <select
                         className="worksite-select"
@@ -577,11 +566,7 @@ export function CreateWorksiteModal({ onClose, onSaved }: CreateWorksiteModalPro
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="worksite-btn-submit"
-                  disabled={submitting}
-                >
+                <button type="submit" className="worksite-btn-submit" disabled={submitting}>
                   <Check size={16} />
                   <span>{submitting ? 'Creating Site & GPS...' : 'Create Working Site'}</span>
                 </button>

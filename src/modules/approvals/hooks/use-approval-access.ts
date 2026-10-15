@@ -26,9 +26,7 @@ export function useApprovalAccess() {
             grant.permission === permission &&
             (grant.scopeKind === 7 ||
               (grant.scopeKind === scopeKind &&
-                (targetId === null
-                  ? grant.targetId === null
-                  : grant.targetId === targetId))),
+                (targetId === null ? grant.targetId === null : grant.targetId === targetId))),
         ),
       ),
   };

@@ -43,7 +43,8 @@ const codes: Record<string, string> = {
     'The chosen account cannot receive this delegation. It must be your own delegate target with an active, approved and eligible employment record.',
   invalid_approval_delegation_target: 'The delegation scope target does not exist.',
   invalid_approval_delegation_start: 'The delegation start cannot be in the past.',
-  invalid_approval_reason: 'Enter a single-line reason using ordinary text (up to 1000 characters).',
+  invalid_approval_reason:
+    'Enter a single-line reason using ordinary text (up to 1000 characters).',
   invalid_approval_version:
     'The record version was missing or malformed. Reload the record and try again.',
   invalid_idempotency_key: 'The action could not be submitted safely. Reload and try again.',
@@ -88,7 +89,8 @@ export function approvalWriteError(
   fallback: string | null,
 ): string | null {
   if (!fallback) return null;
-  const hint = status === 400 || status === 403 || status === 409 ? writeHints[operation][status] : undefined;
+  const hint =
+    status === 400 || status === 403 || status === 409 ? writeHints[operation][status] : undefined;
   if (!hint) return fallback;
   const reference = / Reference: (\S+)$/.exec(fallback)?.[1];
   return reference ? `${hint} Reference: ${reference}` : hint;

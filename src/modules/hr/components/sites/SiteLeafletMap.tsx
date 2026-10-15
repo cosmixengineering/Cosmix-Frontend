@@ -46,9 +46,7 @@ function calculateWorkerCoords(
 ): [number, number] {
   const rad = (angleDeg * Math.PI) / 180;
   const dLat = (distanceMeters * Math.sin(rad)) / 111320;
-  const dLon =
-    (distanceMeters * Math.cos(rad)) /
-    (111320 * Math.cos((centerLat * Math.PI) / 180));
+  const dLon = (distanceMeters * Math.cos(rad)) / (111320 * Math.cos((centerLat * Math.PI) / 180));
   return [centerLat + dLat, centerLon + dLon];
 }
 
@@ -215,22 +213,18 @@ export function SiteLeafletMap({
 
     // 3. Render Worker Pins
     displayedWorkers.forEach((w) => {
-      const [wLat, wLon] = calculateWorkerCoords(
-        latitude,
-        longitude,
-        w.distanceMeters,
-        w.angleDeg,
-      );
+      const [wLat, wLon] = calculateWorkerCoords(latitude, longitude, w.distanceMeters, w.angleDeg);
 
       const isInside = w.distanceMeters <= radiusMeters * 0.85;
       const isSelected = selectedWorkerNumber === w.number;
-      const initials = w.name
-        .split(' ')
-        .filter((p) => !p.startsWith('Engr.'))
-        .map((p) => p[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase() || 'WK';
+      const initials =
+        w.name
+          .split(' ')
+          .filter((p) => !p.startsWith('Engr.'))
+          .map((p) => p[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase() || 'WK';
 
       const pinColor = isInside ? '#16a34a' : '#d97706';
       const borderStyle = isSelected ? '3px solid #38bdf8' : '2px solid #ffffff';
@@ -283,9 +277,7 @@ export function SiteLeafletMap({
         iconAnchor: [30, 13],
       });
 
-      const workerMarker = L.marker([wLat, wLon], { icon: workerIcon }).addTo(
-        markersGroup,
-      );
+      const workerMarker = L.marker([wLat, wLon], { icon: workerIcon }).addTo(markersGroup);
 
       workerMarker.on('click', () => {
         onSelectWorker(w.number);
@@ -317,14 +309,7 @@ export function SiteLeafletMap({
         </div>
       `);
     });
-  }, [
-    latitude,
-    longitude,
-    radiusMeters,
-    displayedWorkers,
-    selectedWorkerNumber,
-    siteName,
-  ]);
+  }, [latitude, longitude, radiusMeters, displayedWorkers, selectedWorkerNumber, siteName]);
 
   // Center on worker if selected
   useEffect(() => {
@@ -419,12 +404,7 @@ export function SiteLeafletMap({
           </button>
 
           {/* Controls */}
-          <button
-            type="button"
-            className="map-control-btn"
-            title="Zoom In"
-            onClick={handleZoomIn}
-          >
+          <button type="button" className="map-control-btn" title="Zoom In" onClick={handleZoomIn}>
             <ZoomIn size={14} />
           </button>
           <button
@@ -460,10 +440,7 @@ export function SiteLeafletMap({
 
       {/* Real Interactive Leaflet Container */}
       <div style={{ position: 'relative', width: '100%', height: '400px', background: '#e2e8f0' }}>
-        <div
-          ref={mapContainerRef}
-          style={{ width: '100%', height: '100%', zIndex: 1 }}
-        />
+        <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
 
         {/* Floating Centroid Info Badge */}
         <div

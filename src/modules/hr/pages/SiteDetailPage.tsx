@@ -480,11 +480,9 @@ export function SiteDetailPage() {
     geofenceConfiguration,
     true,
   );
-  const employeesQuery = useHrQuery(
-    'employees?pageSize=100',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
 
   // Map state
   const [selectedWorkerNumber, setSelectedWorkerNumber] = useState<number | null>(null);
@@ -869,7 +867,7 @@ export function SiteDetailPage() {
           selectedWorkerNumber={selectedWorkerNumber}
           onSelectWorker={setSelectedWorkerNumber}
         />
-              </div>
+      </div>
 
       {/* 4. Deployed Workers / Staff Roster Table */}
       <div className="site-workforce-panel">

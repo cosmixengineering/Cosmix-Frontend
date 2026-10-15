@@ -136,25 +136,17 @@ export function ShiftsPage() {
   );
 
   // Query Backend Sites
-  const sitesQuery = useHrQuery(
-    'sites?page=1&pageSize=50',
-    pageOf(siteSchema),
-    ['hr.sites.read'],
-  );
+  const sitesQuery = useHrQuery('sites?page=1&pageSize=50', pageOf(siteSchema), ['hr.sites.read']);
 
   // Query Active Workforce to dynamically populate "Workforce Scheduled" KPI
-  const activeEmployeesQuery = useHrQuery(
-    'employees?status=2&pageSize=1',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const activeEmployeesQuery = useHrQuery('employees?status=2&pageSize=1', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
   const activeEmployeesCount = activeEmployeesQuery.data?.totalCount ?? 0;
 
-  const draftEmployeesQuery = useHrQuery(
-    'employees?status=0&pageSize=1',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const draftEmployeesQuery = useHrQuery('employees?status=0&pageSize=1', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
   const draftEmployeesCount = draftEmployeesQuery.data?.totalCount ?? 0;
 
   // Local list populated EXCLUSIVELY from backend database
@@ -176,17 +168,9 @@ export function ShiftsPage() {
           bs.name.toLowerCase().includes('corporate') ||
           bs.name.toLowerCase().includes('office');
 
-        const category = isNight
-          ? 'Night Operations'
-          : isHq
-          ? 'Corporate'
-          : 'Site Technical';
+        const category = isNight ? 'Night Operations' : isHq ? 'Corporate' : 'Site Technical';
 
-        const iconType: ShiftItem['iconType'] = isNight
-          ? 'moon'
-          : isHq
-          ? 'building'
-          : 'sun';
+        const iconType: ShiftItem['iconType'] = isNight ? 'moon' : isHq ? 'building' : 'sun';
 
         const startTime = isNight ? '08:00 PM' : isHq ? '09:00 AM' : '08:00 AM';
         const endTime = isNight ? '05:00 AM' : isHq ? '06:00 PM' : '05:00 PM';
@@ -319,7 +303,11 @@ export function ShiftsPage() {
         category: newCategory,
         isActive: true,
         version: 'AAAAAAAAB9H=',
-        iconType: newCategory.includes('Night') ? 'moon' : newCategory.includes('Corporate') ? 'building' : 'sun',
+        iconType: newCategory.includes('Night')
+          ? 'moon'
+          : newCategory.includes('Corporate')
+            ? 'building'
+            : 'sun',
         startTime: `${newStartTime} ${Number(newStartTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}`,
         endTime: `${newEndTime} ${Number(newEndTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}`,
         durationHours: '9.0h',
@@ -337,7 +325,9 @@ export function ShiftsPage() {
 
       setShiftsList((prev) => [createdItem, ...prev]);
       setShowCreateModal(false);
-      setNotification(`Shift "${createdItem.code} - ${createdItem.name}" has been created successfully.`);
+      setNotification(
+        `Shift "${createdItem.code} - ${createdItem.name}" has been created successfully.`,
+      );
       setTimeout(() => setNotification(null), 4000);
 
       // Reset form
@@ -406,7 +396,9 @@ export function ShiftsPage() {
       console.warn('Backend site assignment fallback notice:', err);
       // Still show success to user if simulated or succeeded
       setShowAssignModal(false);
-      setNotification(`Shift successfully assigned to site with effective date ${assignEffectiveFrom}!`);
+      setNotification(
+        `Shift successfully assigned to site with effective date ${assignEffectiveFrom}!`,
+      );
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setIsSubmitting(false);
@@ -420,7 +412,17 @@ export function ShiftsPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Code', 'Name', 'Category', 'Timings', 'Grace', 'OT Rate', 'Working Days', 'Assigned', 'Status'];
+    const headers = [
+      'Code',
+      'Name',
+      'Category',
+      'Timings',
+      'Grace',
+      'OT Rate',
+      'Working Days',
+      'Assigned',
+      'Status',
+    ];
     const rows = filteredShifts.map((s) => [
       s.code,
       `"${s.name}"`,
@@ -432,7 +434,9 @@ export function ShiftsPage() {
       s.workersAssigned,
       s.isActive ? 'Active' : 'Inactive',
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -746,147 +750,152 @@ export function ShiftsPage() {
         ) : (
           <div className="shift-cards-grid">
             {filteredShifts.map((shift) => (
-            <div key={shift.id} className="shift-card">
-              {/* Header */}
-              <div>
-                <div className="shift-card-header">
-                  <div
-                    className={`shift-type-icon ${
-                      shift.iconType === 'sun'
-                        ? 'icon-sun'
-                        : shift.iconType === 'building'
-                          ? 'icon-building'
-                          : 'icon-moon'
-                    }`}
-                  >
-                    {shift.iconType === 'sun' ? (
-                      <Sun size={13} />
-                    ) : shift.iconType === 'building' ? (
-                      <Building2 size={13} />
-                    ) : (
-                      <Moon size={13} />
-                    )}
-                  </div>
-
-                  <div className="shift-card-head-content">
-                    <div className="shift-card-badges-row">
-                      <span className="shift-code-badge">{shift.code}</span>
-                      <span
-                        className={`shift-status-pill ${
-                          shift.isActive ? 'active' : 'inactive'
-                        }`}
-                      >
-                        {shift.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                      {shift.nightAllowance && (
-                        <span className="shift-allowance-pill">{shift.nightAllowance}</span>
+              <div key={shift.id} className="shift-card">
+                {/* Header */}
+                <div>
+                  <div className="shift-card-header">
+                    <div
+                      className={`shift-type-icon ${
+                        shift.iconType === 'sun'
+                          ? 'icon-sun'
+                          : shift.iconType === 'building'
+                            ? 'icon-building'
+                            : 'icon-moon'
+                      }`}
+                    >
+                      {shift.iconType === 'sun' ? (
+                        <Sun size={13} />
+                      ) : shift.iconType === 'building' ? (
+                        <Building2 size={13} />
+                      ) : (
+                        <Moon size={13} />
                       )}
                     </div>
-                    <h3 className="shift-card-title">{shift.name}</h3>
-                    <p className="shift-card-category">{shift.category}</p>
+
+                    <div className="shift-card-head-content">
+                      <div className="shift-card-badges-row">
+                        <span className="shift-code-badge">{shift.code}</span>
+                        <span
+                          className={`shift-status-pill ${shift.isActive ? 'active' : 'inactive'}`}
+                        >
+                          {shift.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        {shift.nightAllowance && (
+                          <span className="shift-allowance-pill">{shift.nightAllowance}</span>
+                        )}
+                      </div>
+                      <h3 className="shift-card-title">{shift.name}</h3>
+                      <p className="shift-card-category">{shift.category}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="shift-menu-btn"
+                      title="Shift Options"
+                      onClick={() => openAssignModalForShift(shift)}
+                    >
+                      <MoreVertical size={13} />
+                    </button>
+                  </div>
+
+                  {/* Timings */}
+                  <div className="shift-timing-box">
+                    <div className="shift-timing-col">
+                      <span className="shift-timing-label">START TIME</span>
+                      <span className="shift-timing-val">{shift.startTime}</span>
+                    </div>
+
+                    <div className="shift-timing-center">
+                      <span className="shift-duration-badge">{shift.durationHours}</span>
+                      <span className="shift-break-text">{shift.breakText}</span>
+                    </div>
+
+                    <div className="shift-timing-col" style={{ textAlign: 'right' }}>
+                      <span className="shift-timing-label">END TIME</span>
+                      <span className="shift-timing-val">{shift.endTime}</span>
+                    </div>
+                  </div>
+
+                  {/* Grace & Overtime */}
+                  <div className="shift-rules-box">
+                    <div className="shift-rules-row">
+                      <div className="shift-rule-item">
+                        <Timer size={11} color="#ea580c" />
+                        <span>
+                          LATE GRACE: <strong>{shift.lateGraceText}</strong>
+                        </span>
+                      </div>
+                      <div className="shift-rule-item">
+                        <Clock size={11} color="#2563eb" />
+                        <span>
+                          OVERTIME: <strong>{shift.overtimeText}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="shift-sub-rules-row">
+                      <div className="shift-sub-rule">
+                        <span style={{ color: '#ea580c' }}>🕒</span>
+                        <span>½ Day Arrival: {shift.halfDayArrival}</span>
+                      </div>
+                      <span>|</span>
+                      <div className="shift-sub-rule">
+                        <span style={{ color: '#dc2626' }}>🔴</span>
+                        <span>Absent After: {shift.absentAfter}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Working Days */}
+                  <div className="shift-days-box">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          color: '#94a3b8',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Working Days:
+                      </span>
+                      <div className="shift-days-pills">
+                        {shift.workingDays.map((active, dayIdx) => (
+                          <div
+                            key={dayIdx}
+                            className={`shift-day-pill ${active ? 'active' : 'inactive'}`}
+                            title={active ? 'Working Day' : 'Day Off'}
+                          >
+                            {WEEKDAY_NAMES[dayIdx]}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="shift-days-count">{shift.daysCountText}</span>
+                  </div>
+
+                  {/* Quote / Description */}
+                  <p className="shift-description-quote">"{shift.description}"</p>
+                </div>
+
+                {/* Footer */}
+                <div className="shift-card-footer">
+                  <div className="shift-assigned-count">
+                    <Users size={12} />
+                    <span>{shift.workersAssigned} Workers Assigned</span>
                   </div>
 
                   <button
                     type="button"
-                    className="shift-menu-btn"
-                    title="Shift Options"
+                    className="shift-manage-btn"
                     onClick={() => openAssignModalForShift(shift)}
                   >
-                    <MoreVertical size={13} />
+                    <Settings2 size={11} />
+                    <span>Manage</span>
                   </button>
                 </div>
-
-                {/* Timings */}
-                <div className="shift-timing-box">
-                  <div className="shift-timing-col">
-                    <span className="shift-timing-label">START TIME</span>
-                    <span className="shift-timing-val">{shift.startTime}</span>
-                  </div>
-
-                  <div className="shift-timing-center">
-                    <span className="shift-duration-badge">{shift.durationHours}</span>
-                    <span className="shift-break-text">{shift.breakText}</span>
-                  </div>
-
-                  <div className="shift-timing-col" style={{ textAlign: 'right' }}>
-                    <span className="shift-timing-label">END TIME</span>
-                    <span className="shift-timing-val">{shift.endTime}</span>
-                  </div>
-                </div>
-
-                {/* Grace & Overtime */}
-                <div className="shift-rules-box">
-                  <div className="shift-rules-row">
-                    <div className="shift-rule-item">
-                      <Timer size={11} color="#ea580c" />
-                      <span>
-                        LATE GRACE: <strong>{shift.lateGraceText}</strong>
-                      </span>
-                    </div>
-                    <div className="shift-rule-item">
-                      <Clock size={11} color="#2563eb" />
-                      <span>
-                        OVERTIME: <strong>{shift.overtimeText}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="shift-sub-rules-row">
-                    <div className="shift-sub-rule">
-                      <span style={{ color: '#ea580c' }}>🕒</span>
-                      <span>½ Day Arrival: {shift.halfDayArrival}</span>
-                    </div>
-                    <span>|</span>
-                    <div className="shift-sub-rule">
-                      <span style={{ color: '#dc2626' }}>🔴</span>
-                      <span>Absent After: {shift.absentAfter}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Working Days */}
-                <div className="shift-days-box">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>
-                      Working Days:
-                    </span>
-                    <div className="shift-days-pills">
-                      {shift.workingDays.map((active, dayIdx) => (
-                        <div
-                          key={dayIdx}
-                          className={`shift-day-pill ${active ? 'active' : 'inactive'}`}
-                          title={active ? 'Working Day' : 'Day Off'}
-                        >
-                          {WEEKDAY_NAMES[dayIdx]}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <span className="shift-days-count">{shift.daysCountText}</span>
-                </div>
-
-                {/* Quote / Description */}
-                <p className="shift-description-quote">"{shift.description}"</p>
               </div>
-
-              {/* Footer */}
-              <div className="shift-card-footer">
-                <div className="shift-assigned-count">
-                  <Users size={12} />
-                  <span>{shift.workersAssigned} Workers Assigned</span>
-                </div>
-
-                <button
-                  type="button"
-                  className="shift-manage-btn"
-                  onClick={() => openAssignModalForShift(shift)}
-                >
-                  <Settings2 size={11} />
-                  <span>Manage</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
           </div>
         )
       ) : (
@@ -909,7 +918,10 @@ export function ShiftsPage() {
             <tbody>
               {filteredShifts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                  <td
+                    colSpan={9}
+                    style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}
+                  >
                     No shifts found matching the selected filters.
                   </td>
                 </tr>
@@ -929,7 +941,9 @@ export function ShiftsPage() {
                       <span style={{ fontWeight: 600 }}>
                         {shift.startTime} - {shift.endTime}
                       </span>{' '}
-                      <span style={{ color: '#2563eb', fontSize: '11px' }}>({shift.durationHours})</span>
+                      <span style={{ color: '#2563eb', fontSize: '11px' }}>
+                        ({shift.durationHours})
+                      </span>
                     </td>
                     <td>{shift.breakText}</td>
                     <td>
@@ -943,7 +957,9 @@ export function ShiftsPage() {
                       </span>
                     </td>
                     <td>
-                      <span className={`shift-status-pill ${shift.isActive ? 'active' : 'inactive'}`}>
+                      <span
+                        className={`shift-status-pill ${shift.isActive ? 'active' : 'inactive'}`}
+                      >
                         {shift.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -1015,10 +1031,7 @@ export function ShiftsPage() {
 
                   <div className="shift-field-group">
                     <label>Category *</label>
-                    <select
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
-                    >
+                    <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
                       <option value="Site Technical">Site Technical</option>
                       <option value="Corporate">Corporate</option>
                       <option value="Night Operations">Night Operations</option>
@@ -1149,11 +1162,7 @@ export function ShiftsPage() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="shift-btn-primary"
-                  disabled={isSubmitting}
-                >
+                <button type="submit" className="shift-btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Saving Shift...' : 'Save Shift'}
                 </button>
               </div>
@@ -1183,7 +1192,8 @@ export function ShiftsPage() {
             <form onSubmit={handleAssignShiftToSite}>
               <div className="shift-modal-body">
                 <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b' }}>
-                  Assign the active shift schedule directly to a project site roster. All workers and technicians deployed at this site will operate under this schedule.
+                  Assign the active shift schedule directly to a project site roster. All workers
+                  and technicians deployed at this site will operate under this schedule.
                 </p>
 
                 {formError && (
@@ -1216,8 +1226,12 @@ export function ShiftsPage() {
                     ))}
                     {!sitesQuery.data?.items?.length && (
                       <>
-                        <option value="site-fsd-01">FSD-SITE-01 - Khurrianwala Industrial Estate</option>
-                        <option value="site-lhr-02">LHR-SITE-02 - Packages Mall MEP Overhaul</option>
+                        <option value="site-fsd-01">
+                          FSD-SITE-01 - Khurrianwala Industrial Estate
+                        </option>
+                        <option value="site-lhr-02">
+                          LHR-SITE-02 - Packages Mall MEP Overhaul
+                        </option>
                         <option value="site-isb-03">ISB-SITE-03 - Blue Area Tower 4</option>
                       </>
                     )}
@@ -1280,11 +1294,7 @@ export function ShiftsPage() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="shift-btn-primary"
-                  disabled={isSubmitting}
-                >
+                <button type="submit" className="shift-btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Assigning...' : 'Assign Shift to Site'}
                 </button>
               </div>

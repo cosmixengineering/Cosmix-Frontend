@@ -39,7 +39,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 01',
     title: 'Profile & Workplace Placement',
     shortTitle: '1. Profile Info',
-    description: 'Enter basic legal identity, contact numbers, address, and select whether employee is Office-based or Field/Site-based.',
+    description:
+      'Enter basic legal identity, contact numbers, address, and select whether employee is Office-based or Field/Site-based.',
     icon: User,
   },
   {
@@ -48,7 +49,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 02',
     title: 'Financial & Wage Structure',
     shortTitle: '2. Financial',
-    description: 'Configure salary scale, pay frequency, currency, tax rules, and bank account for payroll disbursements.',
+    description:
+      'Configure salary scale, pay frequency, currency, tax rules, and bank account for payroll disbursements.',
     icon: CreditCard,
   },
   {
@@ -57,7 +59,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 03',
     title: 'Medical & Fitness History',
     shortTitle: '3. Medical',
-    description: 'Record blood group, health disclosures, fitness clearances, emergency medical conditions, and insurance coverage.',
+    description:
+      'Record blood group, health disclosures, fitness clearances, emergency medical conditions, and insurance coverage.',
     icon: HeartPulse,
   },
   {
@@ -66,7 +69,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 04',
     title: 'CNIC & Identity Documents',
     shortTitle: '4. Documents',
-    description: 'Upload verified scanned identity proof (CNIC front/back, passport), academic degrees, and experience certificates.',
+    description:
+      'Upload verified scanned identity proof (CNIC front/back, passport), academic degrees, and experience certificates.',
     icon: Folder,
   },
   {
@@ -75,7 +79,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 05',
     title: 'Medical Clearance Reports',
     shortTitle: '5. Medical Docs',
-    description: 'Attach certified doctor fit-to-work letters, clinical diagnostic reports, and occupational lab test results.',
+    description:
+      'Attach certified doctor fit-to-work letters, clinical diagnostic reports, and occupational lab test results.',
     icon: FileCheck,
   },
   {
@@ -84,7 +89,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 06',
     title: 'Biometrics & Live Face ID',
     shortTitle: '6. Biometrics',
-    description: 'Open web camera, align employee face inside the guide frame, and enroll active facial recognition template.',
+    description:
+      'Open web camera, align employee face inside the guide frame, and enroll active facial recognition template.',
     icon: Fingerprint,
   },
   {
@@ -93,7 +99,8 @@ const ONBOARDING_STEPS = [
     stepTag: 'STEP 07',
     title: 'Review & Send for Admin Approval',
     shortTitle: '7. Review & Submit',
-    description: 'Review complete employee portfolio, audit required attachments, and transmit draft to Admin for final authorization.',
+    description:
+      'Review complete employee portfolio, audit required attachments, and transmit draft to Admin for final authorization.',
     icon: Send,
   },
 ] as const;
@@ -272,7 +279,12 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
                         return (
                           <div
                             key={s.key}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              flexShrink: 0,
+                            }}
                           >
                             <Link
                               to={allowed ? `?tab=${s.key}` : '#'}
@@ -316,9 +328,7 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
                         <h2 className="onboarding-hero-title">
                           Step {currentStep.stepNumber}: {currentStep.title}
                         </h2>
-                        <p className="onboarding-hero-desc">
-                          {currentStep.description}
-                        </p>
+                        <p className="onboarding-hero-desc">{currentStep.description}</p>
                       </div>
                     </div>
                     <div className="onboarding-hero-right">
@@ -333,169 +343,183 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
                   {!tabs.some((t) => t.key === tab && t.allowed) ? (
                     <Denied />
                   ) : tab === 'profile' ? (
-                  <ProfileForm
-                    key={employee.version}
-                    employeeId={employeeId}
-                    initial={profile}
-                    version={employee.version}
-                    editable={editable && access.can('hr.employees.drafts.manage')}
-                    onSaved={onSaved}
-                  />
-                ) : tab === 'financial' || tab === 'medical' ? (
-                  <>
-                    <SensitiveSection
-                      key={tab}
+                    <ProfileForm
+                      key={employee.version}
                       employeeId={employeeId}
-                      section={tab}
-                      editable={editable}
-                      profile={profile}
-                      onSaved={() => onSaved()}
-                    />
-                    <div className="stepper-nav-footer">
-                      <div>
-                        {prevStep && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${prevStep.key}`);
-                            }}
-                          >
-                            <ChevronLeft size={16} />
-                            <span>Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}</span>
-                          </Button>
-                        )}
-                      </div>
-                      <div className="stepper-nav-right">
-                        {nextStep && (
-                          <Button
-                            type="button"
-                            variant="success"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${nextStep.key}`);
-                            }}
-                          >
-                            <span>Continue to Step {nextStep.stepNumber}: {nextStep.shortTitle}</span>
-                            <ChevronRight size={16} />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : tab === 'documents' || tab === 'medical-documents' ? (
-                  <>
-                    <EmployeeDocuments
-                      key={tab}
-                      employeeId={employeeId}
+                      initial={profile}
                       version={employee.version}
-                      editable={editable}
-                      medical={tab === 'medical-documents'}
-                      onSaved={() => onSaved()}
+                      editable={editable && access.can('hr.employees.drafts.manage')}
+                      onSaved={onSaved}
                     />
-                    <div className="stepper-nav-footer">
-                      <div>
-                        {prevStep && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${prevStep.key}`);
-                            }}
-                          >
-                            <ChevronLeft size={16} />
-                            <span>Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}</span>
-                          </Button>
-                        )}
+                  ) : tab === 'financial' || tab === 'medical' ? (
+                    <>
+                      <SensitiveSection
+                        key={tab}
+                        employeeId={employeeId}
+                        section={tab}
+                        editable={editable}
+                        profile={profile}
+                        onSaved={() => onSaved()}
+                      />
+                      <div className="stepper-nav-footer">
+                        <div>
+                          {prevStep && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${prevStep.key}`);
+                              }}
+                            >
+                              <ChevronLeft size={16} />
+                              <span>
+                                Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}
+                              </span>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="stepper-nav-right">
+                          {nextStep && (
+                            <Button
+                              type="button"
+                              variant="success"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${nextStep.key}`);
+                              }}
+                            >
+                              <span>
+                                Continue to Step {nextStep.stepNumber}: {nextStep.shortTitle}
+                              </span>
+                              <ChevronRight size={16} />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="stepper-nav-right">
-                        {nextStep && (
-                          <Button
-                            type="button"
-                            variant="success"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${nextStep.key}`);
-                            }}
-                          >
-                            <span>Continue to Step {nextStep.stepNumber}: {nextStep.shortTitle}</span>
-                            <ChevronRight size={16} />
-                          </Button>
-                        )}
+                    </>
+                  ) : tab === 'documents' || tab === 'medical-documents' ? (
+                    <>
+                      <EmployeeDocuments
+                        key={tab}
+                        employeeId={employeeId}
+                        version={employee.version}
+                        editable={editable}
+                        medical={tab === 'medical-documents'}
+                        onSaved={() => onSaved()}
+                      />
+                      <div className="stepper-nav-footer">
+                        <div>
+                          {prevStep && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${prevStep.key}`);
+                              }}
+                            >
+                              <ChevronLeft size={16} />
+                              <span>
+                                Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}
+                              </span>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="stepper-nav-right">
+                          {nextStep && (
+                            <Button
+                              type="button"
+                              variant="success"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${nextStep.key}`);
+                              }}
+                            >
+                              <span>
+                                Continue to Step {nextStep.stepNumber}: {nextStep.shortTitle}
+                              </span>
+                              <ChevronRight size={16} />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                ) : tab === 'biometrics' ? (
-                  <>
-                    <EmployeeBiometricSection
-                      key={employeeId}
-                      employeeId={employeeId}
-                      compact
-                      onEnrolled={() => onSaved('submission')}
-                    />
-                    <div className="stepper-nav-footer">
-                      <div>
-                        {prevStep && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${prevStep.key}`);
-                            }}
-                          >
-                            <ChevronLeft size={16} />
-                            <span>Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}</span>
-                          </Button>
-                        )}
+                    </>
+                  ) : tab === 'biometrics' ? (
+                    <>
+                      <EmployeeBiometricSection
+                        key={employeeId}
+                        employeeId={employeeId}
+                        compact
+                        onEnrolled={() => onSaved('submission')}
+                      />
+                      <div className="stepper-nav-footer">
+                        <div>
+                          {prevStep && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${prevStep.key}`);
+                              }}
+                            >
+                              <ChevronLeft size={16} />
+                              <span>
+                                Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}
+                              </span>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="stepper-nav-right">
+                          {nextStep && (
+                            <Button
+                              type="button"
+                              variant="success"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${nextStep.key}`);
+                              }}
+                            >
+                              <span>
+                                Continue to Step {nextStep.stepNumber}: {nextStep.shortTitle}
+                              </span>
+                              <ChevronRight size={16} />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="stepper-nav-right">
-                        {nextStep && (
-                          <Button
-                            type="button"
-                            variant="success"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${nextStep.key}`);
-                            }}
-                          >
-                            <span>Continue to Step {nextStep.stepNumber}: {nextStep.shortTitle}</span>
-                            <ChevronRight size={16} />
-                          </Button>
-                        )}
+                    </>
+                  ) : (
+                    <>
+                      <SubmissionReview
+                        employeeId={employeeId}
+                        version={employee.version}
+                        editable={editable}
+                        selected={profile.documentIds}
+                        onSaved={() => onSaved()}
+                      />
+                      <div className="stepper-nav-footer">
+                        <div>
+                          {prevStep && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => {
+                                setSaved(false);
+                                navigate(`?tab=${prevStep.key}`);
+                              }}
+                            >
+                              <ChevronLeft size={16} />
+                              <span>
+                                Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}
+                              </span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <SubmissionReview
-                      employeeId={employeeId}
-                      version={employee.version}
-                      editable={editable}
-                      selected={profile.documentIds}
-                      onSaved={() => onSaved()}
-                    />
-                    <div className="stepper-nav-footer">
-                      <div>
-                        {prevStep && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => {
-                              setSaved(false);
-                              navigate(`?tab=${prevStep.key}`);
-                            }}
-                          >
-                            <ChevronLeft size={16} />
-                            <span>Previous: Step {prevStep.stepNumber} - {prevStep.shortTitle}</span>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
                 </div>
               </>
             );

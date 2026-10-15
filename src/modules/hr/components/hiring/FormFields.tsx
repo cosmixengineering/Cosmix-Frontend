@@ -100,7 +100,12 @@ export function PhoneField({
     <div className="field">
       <label htmlFor={id}>
         {label}
-        {required && <span className="hr-required-mark" aria-hidden="true"> *</span>}
+        {required && (
+          <span className="hr-required-mark" aria-hidden="true">
+            {' '}
+            *
+          </span>
+        )}
       </label>
       <div className="phone-input-group" data-invalid={Boolean(error)}>
         <span className="phone-prefix-addon" aria-hidden="true">
@@ -149,7 +154,12 @@ export function LongField({
     <div className="field wide">
       <label htmlFor={id}>
         {label}
-        {required && <span className="hr-required-mark" aria-hidden="true"> *</span>}
+        {required && (
+          <span className="hr-required-mark" aria-hidden="true">
+            {' '}
+            *
+          </span>
+        )}
       </label>
       <textarea
         id={id}

@@ -46,23 +46,17 @@ export function HrDashboardPage() {
   const displayName = user?.account?.displayName || 'HR Officer';
 
   // 1. Dynamic Backend Queries: Distinguish Real Active Employees vs Incomplete Drafts
-  const employeesQuery = useHrQuery(
-    'employees?page=1&pageSize=50',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const employeesQuery = useHrQuery('employees?page=1&pageSize=50', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
 
-  const activeEmployeesQuery = useHrQuery(
-    'employees?status=2&pageSize=1',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const activeEmployeesQuery = useHrQuery('employees?status=2&pageSize=1', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
 
-  const draftEmployeesQuery = useHrQuery(
-    'employees?status=0&pageSize=1',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const draftEmployeesQuery = useHrQuery('employees?status=0&pageSize=1', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
 
   const { activeEmployeesCount, draftEmployeesCount } = useMemo(() => {
     const items = employeesQuery.data?.items ?? [];
@@ -88,11 +82,7 @@ export function HrDashboardPage() {
   }, [employeesQuery.data, activeEmployeesQuery.data, draftEmployeesQuery.data]);
 
   // 2. Dynamic Backend Query: Real Operational Sites
-  const sitesQuery = useHrQuery(
-    'sites?page=1&pageSize=50',
-    pageOf(siteSchema),
-    ['hr.sites.read'],
-  );
+  const sitesQuery = useHrQuery('sites?page=1&pageSize=50', pageOf(siteSchema), ['hr.sites.read']);
   const activeSitesCount = sitesQuery.data?.totalCount ?? sitesQuery.data?.items?.length ?? 0;
 
   // 3. Dynamic Backend Query: Real Pending Hiring Submissions
@@ -101,7 +91,8 @@ export function HrDashboardPage() {
     pageOf(submissionSummarySchema),
     ['hr.employees.read', 'hr.employees.submissions.review'],
   );
-  const pendingSubmissionsCount = submissionsQuery.data?.totalCount ?? submissionsQuery.data?.items?.length ?? 0;
+  const pendingSubmissionsCount =
+    submissionsQuery.data?.totalCount ?? submissionsQuery.data?.items?.length ?? 0;
 
   // 4. Dynamic Backend Query: Real Pending Leaves Queue
   const pendingLeavesQuery = useAttendanceQuery(
@@ -109,7 +100,8 @@ export function HrDashboardPage() {
     leavePage,
     access.can('attendance.leaves.review'),
   );
-  const pendingLeavesCount = pendingLeavesQuery.data?.totalCount ?? pendingLeavesQuery.data?.items?.length ?? 0;
+  const pendingLeavesCount =
+    pendingLeavesQuery.data?.totalCount ?? pendingLeavesQuery.data?.items?.length ?? 0;
 
   // Aggregated dynamic metrics (strictly computed on ACTIVE workforce, NEVER on drafts)
   const totalPendingCases = pendingSubmissionsCount + pendingLeavesCount;
@@ -118,7 +110,8 @@ export function HrDashboardPage() {
   const turnoutPercent =
     activeEmployeesCount > 0 ? ((turnoutPresent / activeEmployeesCount) * 100).toFixed(1) : '0.0';
 
-  const currentCycle = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) + ' Cycle';
+  const currentCycle =
+    new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) + ' Cycle';
   const estimatedPayroll =
     activeEmployeesCount > 0 ? (activeEmployeesCount * 0.085).toFixed(2) : '0.00';
 
@@ -303,9 +296,7 @@ export function HrDashboardPage() {
                   ● {turnoutPercent}% Present ({activeSitesCount} Sites)
                 </span>
               ) : (
-                <span style={{ color: '#94a3b8' }}>
-                  0% Present (No active employees)
-                </span>
+                <span style={{ color: '#94a3b8' }}>0% Present (No active employees)</span>
               )}
             </div>
           </div>
@@ -326,8 +317,8 @@ export function HrDashboardPage() {
               {totalPendingCases > 0
                 ? `${totalPendingCases} Cases`
                 : draftEmployeesCount > 0
-                ? `${draftEmployeesCount} Drafts`
-                : '0 Cases'}
+                  ? `${draftEmployeesCount} Drafts`
+                  : '0 Cases'}
             </div>
             <div className="dash-v3-kpi-sub">
               {pendingSubmissionsCount > 0 || pendingLeavesCount > 0 ? (
@@ -374,7 +365,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">1. Employee Master</h3>
-            <p className="dash-v3-module-desc">Directory, Onboarding, Profiles, Credentials & Roles.</p>
+            <p className="dash-v3-module-desc">
+              Directory, Onboarding, Profiles, Credentials & Roles.
+            </p>
           </div>
         </Link>
 
@@ -385,7 +378,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">2. Organization Structure</h3>
-            <p className="dash-v3-module-desc">Departments, Designations, Branches, Categories & Holidays.</p>
+            <p className="dash-v3-module-desc">
+              Departments, Designations, Branches, Categories & Holidays.
+            </p>
           </div>
         </Link>
 
@@ -396,7 +391,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">3. Working Sites & Geofences</h3>
-            <p className="dash-v3-module-desc">Project sites, GPS coordinates & operational work zones.</p>
+            <p className="dash-v3-module-desc">
+              Project sites, GPS coordinates & operational work zones.
+            </p>
           </div>
         </Link>
 
@@ -407,7 +404,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">4. Attendance & Punches</h3>
-            <p className="dash-v3-module-desc">Biometrics, Mobile face verification, GPS radius & exceptions.</p>
+            <p className="dash-v3-module-desc">
+              Biometrics, Mobile face verification, GPS radius & exceptions.
+            </p>
           </div>
         </Link>
 
@@ -418,7 +417,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">5. Shift Management</h3>
-            <p className="dash-v3-module-desc">Office & site shifts, schedules, night shifts & rosters.</p>
+            <p className="dash-v3-module-desc">
+              Office & site shifts, schedules, night shifts & rosters.
+            </p>
           </div>
         </Link>
 
@@ -429,7 +430,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">6. Leave & Absence</h3>
-            <p className="dash-v3-module-desc">Leave balances, requests, medical sick leaves & approvals.</p>
+            <p className="dash-v3-module-desc">
+              Leave balances, requests, medical sick leaves & approvals.
+            </p>
           </div>
         </Link>
 
@@ -440,7 +443,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">7. Overtime & Allowances</h3>
-            <p className="dash-v3-module-desc">Continuous 13h/12h duty meal allowances & travel days.</p>
+            <p className="dash-v3-module-desc">
+              Continuous 13h/12h duty meal allowances & travel days.
+            </p>
           </div>
         </Link>
 
@@ -451,7 +456,9 @@ export function HrDashboardPage() {
           </div>
           <div>
             <h3 className="dash-v3-module-title">8. Claims & Advances</h3>
-            <p className="dash-v3-module-desc">Motorcycle fuel (28 km/L), tuning claims & advances.</p>
+            <p className="dash-v3-module-desc">
+              Motorcycle fuel (28 km/L), tuning claims & advances.
+            </p>
           </div>
         </Link>
       </div>
@@ -508,7 +515,9 @@ export function HrDashboardPage() {
                   <span style={{ color: '#64748b' }}>{act.details}</span>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#94a3b8' }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#94a3b8' }}
+                  >
                     <Clock3 size={12} />
                     <span>{act.date}</span>
                   </div>

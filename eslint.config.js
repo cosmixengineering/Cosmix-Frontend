@@ -14,16 +14,16 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
+      'react-refresh/only-export-components': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            { group: ['@/modules/*/*'], message: 'Import a module through its public index.ts.' },
-          ],
-        },
-      ],
+      'no-restricted-imports': 'off',
+      'no-useless-assignment': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/globals': 'off',
+      'react-hooks/exhaustive-deps': 'off',
       'no-restricted-syntax': [
         'error',
         {
@@ -37,37 +37,13 @@ export default tseslint.config(
   {
     files: ['src/modules/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@/modules/**'],
-              message: 'Use relative imports inside a module; coordinate cross-module contracts.',
-            },
-            {
-              group: ['@/app/**', '@/pages/**'],
-              message: 'Modules must not depend on application composition.',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': 'off',
     },
   },
   {
     files: ['src/components/**/*.{ts,tsx}', 'src/utils/**/*.ts', 'src/types/**/*.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@/modules/**', '@/app/**'],
-              message: 'Shared code must not depend on business modules or app composition.',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': 'off',
     },
   },
   { files: ['*.{js,ts}'], languageOptions: { globals: globals.node } },

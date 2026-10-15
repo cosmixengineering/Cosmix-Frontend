@@ -32,11 +32,9 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
   const [simOffline, setSimOffline] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  const query = useHrQuery(
-    `employees/${employeeId}/tracking`,
-    employeeTrackingSchema,
-    ['hr.employees.read'],
-  );
+  const query = useHrQuery(`employees/${employeeId}/tracking`, employeeTrackingSchema, [
+    'hr.employees.read',
+  ]);
 
   if (!access.can('hr.employees.read')) return <Denied />;
 
@@ -159,7 +157,9 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                   <span style={{ fontSize: '12px', fontWeight: 600, color: '#657080' }}>
                     LATEST CHECK-IN
                   </span>
@@ -202,11 +202,14 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                   <span style={{ fontSize: '12px', fontWeight: 600, color: '#657080' }}>
                     GEOFENCE STATUS
                   </span>
-                  {currentPunch?.insideGeofence !== null && currentPunch?.insideGeofence !== undefined ? (
+                  {currentPunch?.insideGeofence !== null &&
+                  currentPunch?.insideGeofence !== undefined ? (
                     currentPunch.insideGeofence ? (
                       <span className="badge badge--positive">
                         <ShieldCheck size={12} style={{ marginRight: '4px' }} />
@@ -224,7 +227,8 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                 </div>
                 <div style={{ marginTop: '10px' }}>
                   <div style={{ fontSize: '16px', fontWeight: 700, color: '#1a202c' }}>
-                    {currentPunch?.distanceMeters !== null && currentPunch?.distanceMeters !== undefined
+                    {currentPunch?.distanceMeters !== null &&
+                    currentPunch?.distanceMeters !== undefined
                       ? `${currentPunch.distanceMeters} m from site`
                       : data.assignedLocation
                         ? `${data.assignedLocation.siteName ?? data.assignedLocation.branchName ?? 'Assigned location'}`
@@ -247,7 +251,9 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                   <span style={{ fontSize: '12px', fontWeight: 600, color: '#657080' }}>
                     ASSIGNED SITE / BRANCH
                   </span>
@@ -334,7 +340,14 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
 
               {/* Map View */}
               {hasCoordinates ? (
-                <div style={{ position: 'relative', width: '100%', height: '480px', background: '#e5e7eb' }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '480px',
+                    background: '#e5e7eb',
+                  }}
+                >
                   <iframe
                     title="Employee Check-in Location Map"
                     width="100%"
@@ -367,7 +380,11 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                     </div>
                     <div style={{ color: '#475569' }}>
                       Status:{' '}
-                      <strong style={{ color: currentPunch?.action === 'CheckIn' ? '#16a34a' : '#d97706' }}>
+                      <strong
+                        style={{
+                          color: currentPunch?.action === 'CheckIn' ? '#16a34a' : '#d97706',
+                        }}
+                      >
                         {currentPunch?.action ?? 'Not Checked In'}
                       </strong>
                     </div>
@@ -376,11 +393,12 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                         Time: {labelDate(currentPunch.receivedAtUtc)}
                       </div>
                     )}
-                    {currentPunch?.distanceMeters !== null && currentPunch?.distanceMeters !== undefined && (
-                      <div style={{ color: '#64748b', marginTop: '2px' }}>
-                        Distance to Site: <strong>{currentPunch.distanceMeters} m</strong>
-                      </div>
-                    )}
+                    {currentPunch?.distanceMeters !== null &&
+                      currentPunch?.distanceMeters !== undefined && (
+                        <div style={{ color: '#64748b', marginTop: '2px' }}>
+                          Distance to Site: <strong>{currentPunch.distanceMeters} m</strong>
+                        </div>
+                      )}
                   </div>
                 </div>
               ) : (
@@ -388,8 +406,8 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                   <MapPin size={48} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
                   <h3 style={{ margin: 0, color: '#334155' }}>No GPS check-in recorded yet</h3>
                   <p style={{ maxWidth: '420px', margin: '8px auto 16px', fontSize: '14px' }}>
-                    When this employee checks in from their mobile device or workstation, their
-                    live location coordinates will appear here on the map.
+                    When this employee checks in from their mobile device or workstation, their live
+                    location coordinates will appear here on the map.
                   </p>
                   <Button variant="primary" onClick={() => setSimulatorOpen(true)}>
                     <Navigation size={16} />
@@ -400,8 +418,22 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
             </div>
 
             {/* Check-in History Table */}
-            <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e3e7ec', padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div
+              style={{
+                background: 'white',
+                borderRadius: '8px',
+                border: '1px solid #e3e7ec',
+                padding: '20px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '16px',
+                }}
+              >
                 <h3 style={{ margin: 0, fontSize: '16px' }}>Recent Check-in & Punch History</h3>
                 <span className="muted" style={{ fontSize: '13px' }}>
                   {data.checkInHistory.length} recorded events
@@ -444,9 +476,13 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                       cell: (r) =>
                         r.insideGeofence !== null ? (
                           r.insideGeofence ? (
-                            <span style={{ color: '#16a34a', fontWeight: 600 }}>✅ Inside ({r.distanceMeters}m)</span>
+                            <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                              ✅ Inside ({r.distanceMeters}m)
+                            </span>
                           ) : (
-                            <span style={{ color: '#dc2626', fontWeight: 600 }}>⚠️ Outside ({r.distanceMeters}m)</span>
+                            <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                              ⚠️ Outside ({r.distanceMeters}m)
+                            </span>
                           )
                         ) : (
                           <span className="muted">—</span>
@@ -506,7 +542,8 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
                   color: '#166534',
                 }}
               >
-                <strong>Quick Test Helper:</strong> You can fetch your real current browser location or select a preset city location to test how the map shows the employee pin!
+                <strong>Quick Test Helper:</strong> You can fetch your real current browser location
+                or select a preset city location to test how the map shows the employee pin!
               </div>
 
               {geoError && (
@@ -516,11 +553,7 @@ export function EmployeeMapTracking({ employeeId }: { employeeId: string }) {
               )}
 
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleUseCurrentLocation}
-                >
+                <Button type="button" variant="secondary" onClick={handleUseCurrentLocation}>
                   <Navigation size={14} />
                   Detect My Current GPS
                 </Button>

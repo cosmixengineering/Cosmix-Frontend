@@ -99,9 +99,7 @@ export function HrRequestsPage() {
               <ClipboardCheck size={26} />
             </div>
             <div>
-              <div className="hr-requests-tagline">
-                HR OPERATIONS &bull; APPROVALS ENGINE
-              </div>
+              <div className="hr-requests-tagline">HR OPERATIONS &bull; APPROVALS ENGINE</div>
               <h1 className="hr-requests-title">HR Requests & Approvals Queue</h1>
               <p className="hr-requests-subtitle">
                 Review, audit and authorize employee record modifications, employment status
@@ -286,12 +284,7 @@ export function HrRequestsPage() {
       {!tabs.some((t) => t.key === tab) ? (
         <Denied />
       ) : section ? (
-        <ChangeRequests
-          key={tab + state}
-          section={section}
-          state={state}
-          search={searchTerm}
-        />
+        <ChangeRequests key={tab + state} section={section} state={state} search={searchTerm} />
       ) : (
         <WorkflowRequests
           key={tab + state}

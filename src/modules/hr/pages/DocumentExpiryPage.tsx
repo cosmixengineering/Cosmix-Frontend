@@ -151,33 +151,53 @@ function DocumentExpiryWorkspace() {
           : `/hr/employees/${emp.id}/hiring`,
     }));
     setSelected(batch);
-    void executeAudit(batch.map((b) => b.id), parsedDays);
+    void executeAudit(
+      batch.map((b) => b.id),
+      parsedDays,
+    );
   };
 
   // Export CSV
   const handleExportCSV = () => {
     if (!result?.rows?.length) return;
-    const headers = ['Employee ID', 'Missing Required Docs', 'Expiring Documents', 'Certifications', 'Blockers'];
+    const headers = [
+      'Employee ID',
+      'Missing Required Docs',
+      'Expiring Documents',
+      'Certifications',
+      'Blockers',
+    ];
     const rows = result.rows.map((row) => {
       const empLabel = selected.find((e) => e.id === row.employeeId)?.label ?? row.employeeId;
-      const missing = row.requiredDocuments
-        .filter((d) => d.isMissing)
-        .map((d) => documentTypes[d.type - 1])
-        .join('; ') || 'None';
-      const expiring = row.expiringDocuments
-        .map((d) => `${documentTypes[d.type - 1]} (${d.expiresOn})`)
-        .join('; ') || 'None';
-      const certs = row.certifications
-        .map((c) => `${c.type ?? c.reference}: ${c.isExpired ? 'Expired' : c.isExpiring ? 'Expiring' : 'Valid'}`)
-        .join('; ') || 'None';
+      const missing =
+        row.requiredDocuments
+          .filter((d) => d.isMissing)
+          .map((d) => documentTypes[d.type - 1])
+          .join('; ') || 'None';
+      const expiring =
+        row.expiringDocuments
+          .map((d) => `${documentTypes[d.type - 1]} (${d.expiresOn})`)
+          .join('; ') || 'None';
+      const certs =
+        row.certifications
+          .map(
+            (c) =>
+              `${c.type ?? c.reference}: ${c.isExpired ? 'Expired' : c.isExpiring ? 'Expiring' : 'Valid'}`,
+          )
+          .join('; ') || 'None';
       const blockers = row.activationBlockers.join('; ') || 'None';
       return [`"${empLabel}"`, `"${missing}"`, `"${expiring}"`, `"${certs}"`, `"${blockers}"`];
     });
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `document_expiry_audit_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute(
+      'download',
+      `document_expiry_audit_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -190,7 +210,10 @@ function DocumentExpiryWorkspace() {
         <div className="doc-expiry-title-group">
           <p className="hr-kicker">HR COMPLIANCE & VERIFICATION</p>
           <h1>Document Expiry & Compliance Monitoring</h1>
-          <p>Audit employee credentials, track expiring certifications, and manage regulatory document requirements</p>
+          <p>
+            Audit employee credentials, track expiring certifications, and manage regulatory
+            document requirements
+          </p>
         </div>
 
         <div className="doc-expiry-header-actions">
@@ -378,13 +401,14 @@ function DocumentExpiryWorkspace() {
                       const displayName = emp.name ? emp.name : `Draft Employee`;
                       const empCode = `EMP-${String(emp.employeeNumber).padStart(4, '0')}`;
                       const formattedLabel = `${displayName} (${empCode})`;
-                      const initials = displayName
-                        .split(' ')
-                        .filter(Boolean)
-                        .map((w) => w[0])
-                        .join('')
-                        .slice(0, 2)
-                        .toUpperCase() || 'EM';
+                      const initials =
+                        displayName
+                          .split(' ')
+                          .filter(Boolean)
+                          .map((w) => w[0])
+                          .join('')
+                          .slice(0, 2)
+                          .toUpperCase() || 'EM';
 
                       return (
                         <div
@@ -447,7 +471,14 @@ function DocumentExpiryWorkspace() {
                   </div>
 
                   {!directory.data.items.length && (
-                    <p style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', padding: '16px' }}>
+                    <p
+                      style={{
+                        fontSize: '11px',
+                        color: '#64748b',
+                        textAlign: 'center',
+                        padding: '16px',
+                      }}
+                    >
                       No employees match your search.
                     </p>
                   )}
@@ -524,7 +555,8 @@ function DocumentExpiryWorkspace() {
                   <div>
                     <strong>Ready to audit {selected.length} employees</strong>
                     <div>
-                      Scanning for passports, licenses, CNICs, and certificates expiring within next {parsedDays} days.
+                      Scanning for passports, licenses, CNICs, and certificates expiring within next{' '}
+                      {parsedDays} days.
                     </div>
                   </div>
                 </>
@@ -533,7 +565,10 @@ function DocumentExpiryWorkspace() {
                   <Clock color="#2563eb" />
                   <div>
                     <strong>No employees selected yet</strong>
-                    <div>Select employees from the left panel or click 'Auto-Select 10' to run a rapid compliance scan.</div>
+                    <div>
+                      Select employees from the left panel or click 'Auto-Select 10' to run a rapid
+                      compliance scan.
+                    </div>
                   </div>
                 </>
               )}
@@ -549,7 +584,9 @@ function DocumentExpiryWorkspace() {
                 onClick={() => void executeAudit()}
               >
                 {pending ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
-                <span>{pending ? 'Executing Document Audit...' : 'Execute Compliance Audit Report'}</span>
+                <span>
+                  {pending ? 'Executing Document Audit...' : 'Execute Compliance Audit Report'}
+                </span>
               </button>
 
               {selected.length === 0 && (
@@ -643,7 +680,14 @@ function DocumentExpiryWorkspace() {
                             <ExternalLink size={11} />
                           </Link>
                           {hasBlockers && (
-                            <span style={{ fontSize: '9px', color: '#dc2626', fontWeight: 600, marginTop: '2px' }}>
+                            <span
+                              style={{
+                                fontSize: '9px',
+                                color: '#dc2626',
+                                fontWeight: 600,
+                                marginTop: '2px',
+                              }}
+                            >
                               ⚠️ {row.activationBlockers.join(', ')}
                             </span>
                           )}
@@ -678,7 +722,9 @@ function DocumentExpiryWorkspace() {
                             ))}
                           </div>
                         ) : (
-                          <span style={{ fontSize: '10.5px', color: '#64748b' }}>None in {parsedDays}d window</span>
+                          <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                            None in {parsedDays}d window
+                          </span>
                         )}
                       </td>
 
@@ -707,7 +753,9 @@ function DocumentExpiryWorkspace() {
                             ))}
                           </div>
                         ) : (
-                          <span style={{ fontSize: '10.5px', color: '#64748b' }}>No certificates</span>
+                          <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                            No certificates
+                          </span>
                         )}
                       </td>
 
@@ -716,7 +764,12 @@ function DocumentExpiryWorkspace() {
                         <Link
                           to={empInfo?.to ?? `/hr/employees/${row.employeeId}`}
                           className="doc-btn-sm"
-                          style={{ textDecoration: 'none', height: '24px', padding: '0 8px', fontSize: '10px' }}
+                          style={{
+                            textDecoration: 'none',
+                            height: '24px',
+                            padding: '0 8px',
+                            fontSize: '10px',
+                          }}
                         >
                           View Profile
                         </Link>
@@ -734,8 +787,8 @@ function DocumentExpiryWorkspace() {
             <ShieldCheck size={32} color="#94a3b8" />
             <h4>No Audit Run Yet</h4>
             <p>
-              Select up to 25 employees from the directory checklist on the left, pick your expiry window, and click
-              'Execute Compliance Audit Report' to inspect credential status.
+              Select up to 25 employees from the directory checklist on the left, pick your expiry
+              window, and click 'Execute Compliance Audit Report' to inspect credential status.
             </p>
             <button
               type="button"

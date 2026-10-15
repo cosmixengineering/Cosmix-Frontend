@@ -97,10 +97,7 @@ export function EmployeesPage() {
           </div>
         </div>
         {access.can('hr.employees.drafts.manage') && (
-          <Button
-            disabled={createAction.pending}
-            onClick={() => void handleCreateNewEmployee()}
-          >
+          <Button disabled={createAction.pending} onClick={() => void handleCreateNewEmployee()}>
             <Plus size={17} />
             {createAction.pending ? 'Opening form...' : 'New employee'}
           </Button>
@@ -156,7 +153,8 @@ export function EmployeesPage() {
                   cell: (r) => (
                     <span
                       style={{
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fontFamily:
+                          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                         fontSize: '11px',
                         fontWeight: 700,
                         color: '#334155',
@@ -183,14 +181,33 @@ export function EmployeesPage() {
                       style={{ textDecoration: 'none' }}
                     >
                       <span className="hr-avatar">
-                        {(r.name && r.name.trim().length > 0 ? r.name.trim().slice(0, 1) : 'E').toUpperCase()}
+                        {(r.name && r.name.trim().length > 0
+                          ? r.name.trim().slice(0, 1)
+                          : 'E'
+                        ).toUpperCase()}
                       </span>
                       <div>
-                        <strong style={{ color: '#0f172a', fontSize: '11.5px', display: 'block', lineHeight: 1.25 }}>
+                        <strong
+                          style={{
+                            color: '#0f172a',
+                            fontSize: '11.5px',
+                            display: 'block',
+                            lineHeight: 1.25,
+                          }}
+                        >
                           {r.name && r.name.trim().length > 0 ? r.name : 'Unnamed draft'}
                         </strong>
-                        <span style={{ fontSize: '10px', color: '#94a3b8', display: 'block', marginTop: '1px' }}>
-                          {r.identityNumber ? `CNIC: ${r.identityNumber}` : `Ref: ${r.id.slice(0, 8)}...`}
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            color: '#94a3b8',
+                            display: 'block',
+                            marginTop: '1px',
+                          }}
+                        >
+                          {r.identityNumber
+                            ? `CNIC: ${r.identityNumber}`
+                            : `Ref: ${r.id.slice(0, 8)}...`}
                         </span>
                       </div>
                     </Link>
@@ -200,17 +217,46 @@ export function EmployeesPage() {
                   id: 'contact',
                   header: 'CONTACT INFO',
                   cell: (r) => (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '3px',
+                        fontSize: '11.5px',
+                      }}
+                    >
                       {r.phone ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#334155', fontWeight: 500 }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            color: '#334155',
+                            fontWeight: 500,
+                          }}
+                        >
                           <Phone size={12} style={{ color: '#64748b', flexShrink: 0 }} />
                           <span>{r.phone}</span>
                         </span>
                       ) : null}
                       {r.email ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#64748b' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            color: '#64748b',
+                          }}
+                        >
                           <Mail size={12} style={{ color: '#94a3b8', flexShrink: 0 }} />
-                          <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span
+                            style={{
+                              maxWidth: '140px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {r.email}
                           </span>
                         </span>
@@ -225,9 +271,21 @@ export function EmployeesPage() {
                   id: 'joined',
                   header: 'JOINED / CREATED',
                   cell: (r) => (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        fontSize: '11.5px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       <span style={{ fontWeight: 600, color: '#334155' }}>
-                        {r.joinedOn ? formatDate(r.joinedOn) : r.createdAt ? formatDate(r.createdAt) : '—'}
+                        {r.joinedOn
+                          ? formatDate(r.joinedOn)
+                          : r.createdAt
+                            ? formatDate(r.createdAt)
+                            : '—'}
                       </span>
                       <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>
                         {r.joinedOn ? 'Joined' : r.createdAt ? 'Draft created' : 'Pending hire'}
@@ -244,10 +302,10 @@ export function EmployeesPage() {
                         r.onboardingStatus === 2
                           ? 'positive'
                           : r.onboardingStatus === 4
-                          ? 'negative'
-                          : r.onboardingStatus === 3
-                          ? 'warning'
-                          : 'neutral'
+                            ? 'negative'
+                            : r.onboardingStatus === 3
+                              ? 'warning'
+                              : 'neutral'
                       }`}
                       style={{
                         fontSize: '11px',
@@ -269,10 +327,10 @@ export function EmployeesPage() {
                             r.onboardingStatus === 2
                               ? '#10b981'
                               : r.onboardingStatus === 4
-                              ? '#ef4444'
-                              : r.onboardingStatus === 3
-                              ? '#f59e0b'
-                              : '#94a3b8',
+                                ? '#ef4444'
+                                : r.onboardingStatus === 3
+                                  ? '#f59e0b'
+                                  : '#94a3b8',
                         }}
                       />
                       {onboardingLabels[r.onboardingStatus] ?? 'Draft'}
@@ -283,7 +341,14 @@ export function EmployeesPage() {
                   id: 'status',
                   header: 'EMPLOYMENT',
                   cell: (r) => (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       <span
                         style={{
                           width: '6px',
@@ -294,12 +359,12 @@ export function EmployeesPage() {
                             r.status === 2
                               ? '#10b981'
                               : r.status === 3
-                              ? '#f59e0b'
-                              : r.status === 5
-                              ? '#ef4444'
-                              : r.status === 4
-                              ? '#94a3b8'
-                              : '#64748b',
+                                ? '#f59e0b'
+                                : r.status === 5
+                                  ? '#ef4444'
+                                  : r.status === 4
+                                    ? '#94a3b8'
+                                    : '#64748b',
                         }}
                       />
                       <span style={{ fontSize: '12px', fontWeight: 500, color: '#1e293b' }}>
@@ -362,7 +427,14 @@ export function EmployeesPage() {
                   id: 'actions',
                   header: '',
                   cell: (r) => (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        gap: '6px',
+                      }}
+                    >
                       <Link
                         to={`/hr/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
                         style={{

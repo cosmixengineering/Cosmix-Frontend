@@ -179,7 +179,9 @@ export function EmployeeBiometricSection({
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera access is not supported by this browser. Please verify browser permissions or upload photo.');
+        throw new Error(
+          'Camera access is not supported by this browser. Please verify browser permissions or upload photo.',
+        );
       }
 
       // Stop any existing tracks before creating new one
@@ -365,28 +367,21 @@ export function EmployeeBiometricSection({
           <div>
             <h2 className="bio-title">Biometrics & Live Face ID Enrollment</h2>
             <p className="bio-subtitle">
-              High-accuracy biometric face recognition for employee attendance, check-ins, and site access.
+              High-accuracy biometric face recognition for employee attendance, check-ins, and site
+              access.
             </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {enrollment.status === 'active' && !streamActive && (
-            <button
-              type="button"
-              className="bio-btn bio-btn-secondary"
-              onClick={startCamera}
-            >
+            <button type="button" className="bio-btn bio-btn-secondary" onClick={startCamera}>
               <RotateCcw size={14} />
               Re-enroll Face
             </button>
           )}
           {enrollment.status === 'active' && (
-            <button
-              type="button"
-              className="bio-btn bio-btn-danger"
-              onClick={handleRevoke}
-            >
+            <button type="button" className="bio-btn bio-btn-danger" onClick={handleRevoke}>
               <Trash2 size={14} />
               Revoke Template
             </button>
@@ -395,10 +390,7 @@ export function EmployeeBiometricSection({
       </div>
 
       {successMsg && (
-        <div
-          className="bio-status-banner is-active"
-          style={{ marginBottom: '16px' }}
-        >
+        <div className="bio-status-banner is-active" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckCircle2 size={16} style={{ color: '#16a34a' }} />
             <span>{successMsg}</span>
@@ -416,7 +408,12 @@ export function EmployeeBiometricSection({
       {cameraError && (
         <div
           className="bio-status-banner is-pending"
-          style={{ background: '#fef2f2', borderColor: '#fca5a5', color: '#b91c1c', marginBottom: '16px' }}
+          style={{
+            background: '#fef2f2',
+            borderColor: '#fca5a5',
+            color: '#b91c1c',
+            marginBottom: '16px',
+          }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertTriangle size={16} style={{ color: '#dc2626' }} />
@@ -480,17 +477,11 @@ export function EmployeeBiometricSection({
             ) : (
               <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>
                 <Camera size={44} style={{ margin: '0 auto 10px', opacity: 0.6 }} />
-                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>
-                  Camera is idle
-                </p>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>Camera is idle</p>
                 <p style={{ margin: '4px 0 16px', fontSize: '11px', color: '#64748b' }}>
                   Click below to open webcam and capture face biometric
                 </p>
-                <button
-                  type="button"
-                  className="bio-btn bio-btn-primary"
-                  onClick={startCamera}
-                >
+                <button type="button" className="bio-btn bio-btn-primary" onClick={startCamera}>
                   <Camera size={14} />
                   Start Live Camera
                 </button>
@@ -514,19 +505,11 @@ export function EmployeeBiometricSection({
           <div className="bio-controls-row">
             {streamActive ? (
               <>
-                <button
-                  type="button"
-                  className="bio-btn bio-btn-primary"
-                  onClick={captureFrame}
-                >
+                <button type="button" className="bio-btn bio-btn-primary" onClick={captureFrame}>
                   <Camera size={14} />
                   Capture Photo
                 </button>
-                <button
-                  type="button"
-                  className="bio-btn bio-btn-secondary"
-                  onClick={stopCamera}
-                >
+                <button type="button" className="bio-btn bio-btn-secondary" onClick={stopCamera}>
                   Cancel
                 </button>
               </>
@@ -562,11 +545,7 @@ export function EmployeeBiometricSection({
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  className="bio-btn bio-btn-primary"
-                  onClick={startCamera}
-                >
+                <button type="button" className="bio-btn bio-btn-primary" onClick={startCamera}>
                   <Camera size={14} />
                   Open Camera
                 </button>

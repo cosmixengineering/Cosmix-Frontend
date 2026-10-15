@@ -162,13 +162,19 @@ export function ChangeForm({
                 if (newType !== 2 && num) {
                   num = formatCnic(num);
                 }
-                set('identity', { ...data.identity!, identityDocumentType: newType, identityDocumentNumber: num });
+                set('identity', {
+                  ...data.identity!,
+                  identityDocumentType: newType,
+                  identityDocumentNumber: num,
+                });
               }}
             />
             <Field
               label="Identity document number"
               required
-              placeholder={data.identity.identityDocumentType === 2 ? 'Passport Number' : '42101-1234567-1'}
+              placeholder={
+                data.identity.identityDocumentType === 2 ? 'Passport Number' : '42101-1234567-1'
+              }
               max={data.identity.identityDocumentType === 2 ? 20 : 15}
               value={data.identity.identityDocumentNumber}
               onChange={(v) => {

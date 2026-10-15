@@ -14,11 +14,7 @@ export async function fetchReportTypes(signal?: AbortSignal): Promise<string[]> 
   return reportTypeList.parse(await request('/hr/reports/types', { signal }));
 }
 
-export async function fetchReport(
-  reportType: string,
-  filter: ReportFilter,
-  signal?: AbortSignal,
-) {
+export async function fetchReport(reportType: string, filter: ReportFilter, signal?: AbortSignal) {
   return reportEnvelope.parse(
     await request(`/hr/reports/${encodeURIComponent(reportType)}` + reportQuery(filter), {
       signal,

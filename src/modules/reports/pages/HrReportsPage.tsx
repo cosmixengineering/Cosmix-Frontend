@@ -43,12 +43,7 @@ export function HrReportsPage() {
       </section>
     );
   }
-  return (
-    <ReportWorkspace
-      key={access.subject}
-      canExport={access.can(permissions.export)}
-    />
-  );
+  return <ReportWorkspace key={access.subject} canExport={access.can(permissions.export)} />;
 }
 
 function ReportWorkspace({ canExport }: { canExport: boolean }) {
@@ -189,7 +184,9 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
       link.rel = 'noopener';
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setExportSuccess(`Exported ${result.metadata.totalCount} rows as ${extension.toUpperCase()}.`);
+      setExportSuccess(
+        `Exported ${result.metadata.totalCount} rows as ${extension.toUpperCase()}.`,
+      );
       setExportReason('');
     } catch (failure) {
       if (!signal.aborted) setExportError(errorMessage(failure));
@@ -257,12 +254,7 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
               error={fieldErrors.to}
               onChange={set('to')}
             />
-            <TextInput
-              label="Single date"
-              type="date"
-              value={filter.date}
-              onChange={set('date')}
-            />
+            <TextInput label="Single date" type="date" value={filter.date} onChange={set('date')} />
             <TextInput
               label="Year"
               type="number"
@@ -279,26 +271,14 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
               value={filter.month}
               onChange={set('month')}
             />
-            <TextInput
-              label="Site id"
-              value={filter.siteId}
-              onChange={set('siteId')}
-            />
+            <TextInput label="Site id" value={filter.siteId} onChange={set('siteId')} />
             <TextInput
               label="Department id"
               value={filter.departmentId}
               onChange={set('departmentId')}
             />
-            <TextInput
-              label="Status"
-              value={filter.status}
-              onChange={set('status')}
-            />
-            <TextInput
-              label="Category"
-              value={filter.category}
-              onChange={set('category')}
-            />
+            <TextInput label="Status" value={filter.status} onChange={set('status')} />
+            <TextInput label="Category" value={filter.category} onChange={set('category')} />
             <TextInput
               label="Document type"
               value={filter.documentType}
@@ -326,10 +306,7 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
           </div>
         )}
         <div className="hr-actions">
-          <Button
-            onClick={(event) => void runPreview(event)}
-            disabled={pending || !reportType}
-          >
+          <Button onClick={(event) => void runPreview(event)} disabled={pending || !reportType}>
             <Search size={16} />
             {pending ? 'Loading...' : 'Preview report'}
           </Button>

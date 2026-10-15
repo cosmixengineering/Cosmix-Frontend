@@ -59,7 +59,9 @@ const TIMELINE_DAYS = [
 ];
 
 export function LeaveManagementPage() {
-  const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Approved' | 'Rejected' | 'Cancelled'>('All');
+  const [activeTab, setActiveTab] = useState<
+    'All' | 'Pending' | 'Approved' | 'Rejected' | 'Cancelled'
+  >('All');
   const [searchQuery, setSearchQuery] = useState('');
   const access = useAttendanceAccess();
   const lifetime = useAttendanceLifetime();
@@ -76,8 +78,12 @@ export function LeaveManagementPage() {
   const [newReason, setNewReason] = useState('');
 
   // Backend queries for real employee list and departments
-  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), ['hr.employees.read']);
-  const deptsQuery = useHrQuery('departments?pageSize=50', pageOf(masterSchema), ['hr.organization.read']);
+  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
+  const deptsQuery = useHrQuery('departments?pageSize=50', pageOf(masterSchema), [
+    'hr.organization.read',
+  ]);
 
   // Backend queries for real leave queue & configured types
   const leavesQuery = useAttendanceQuery(
@@ -413,7 +419,11 @@ export function LeaveManagementPage() {
                 <span className="leave-kpi-value">{sickLeaveCount}</span>
                 <span className="leave-kpi-unit">requests</span>
               </div>
-              <span className="leave-kpi-sub">{sickLeaveCount > 0 ? `${sickLeaveCount} Medical requests logged` : 'No active sick leaves'}</span>
+              <span className="leave-kpi-sub">
+                {sickLeaveCount > 0
+                  ? `${sickLeaveCount} Medical requests logged`
+                  : 'No active sick leaves'}
+              </span>
             </div>
           </div>
           <ChevronRight size={16} color="#94a3b8" />
@@ -549,10 +559,7 @@ export function LeaveManagementPage() {
                     <tr key={req.id}>
                       <td>
                         <div className="att-emp-cell">
-                          <div
-                            className="att-avatar"
-                            style={{ backgroundColor: req.avatarColor }}
-                          >
+                          <div className="att-avatar" style={{ backgroundColor: req.avatarColor }}>
                             {initials}
                           </div>
                           <div className="att-emp-info">
@@ -578,7 +585,9 @@ export function LeaveManagementPage() {
                           <span className="badge-type-unpaid">Unpaid Leave</span>
                         )}
                       </td>
-                      <td style={{ fontWeight: 550 }}>{req.durationDays} {req.durationDays === 1 ? 'day' : 'days'}</td>
+                      <td style={{ fontWeight: 550 }}>
+                        {req.durationDays} {req.durationDays === 1 ? 'day' : 'days'}
+                      </td>
                       <td>{req.dateRangeDisplay}</td>
                       <td>
                         {req.evidenceSubmitted ? (
@@ -623,10 +632,14 @@ export function LeaveManagementPage() {
 
           {/* Pagination */}
           <div className="att-table-pagination">
-            <span>Showing 1 to {filteredRequests.length} of {requestsList.length} requests</span>
+            <span>
+              Showing 1 to {filteredRequests.length} of {requestsList.length} requests
+            </span>
             {requestsList.length > 10 && (
               <div className="att-page-nav">
-                <button className="att-page-btn active" type="button">1</button>
+                <button className="att-page-btn active" type="button">
+                  1
+                </button>
               </div>
             )}
           </div>
@@ -649,7 +662,9 @@ export function LeaveManagementPage() {
                   <span className="leave-dot" style={{ background: '#22c55e' }} />
                   <span>Annual Leave</span>
                 </div>
-                <span className="leave-balance-num">{annualRemainingDays} / {annualPolicyDays} days</span>
+                <span className="leave-balance-num">
+                  {annualRemainingDays} / {annualPolicyDays} days
+                </span>
               </div>
 
               <div className="leave-balance-row">
@@ -658,7 +673,14 @@ export function LeaveManagementPage() {
                   <span>Sick Leave</span>
                 </div>
                 <span className="leave-balance-num">
-                  {Math.max(0, 10 - requestsList.filter((r) => r.leaveType === 'Sick Leave' && r.status === 'Approved').reduce((acc, r) => acc + r.durationDays, 0))} / 10 days
+                  {Math.max(
+                    0,
+                    10 -
+                      requestsList
+                        .filter((r) => r.leaveType === 'Sick Leave' && r.status === 'Approved')
+                        .reduce((acc, r) => acc + r.durationDays, 0),
+                  )}{' '}
+                  / 10 days
                 </span>
               </div>
 
@@ -668,7 +690,14 @@ export function LeaveManagementPage() {
                   <span>Casual Leave</span>
                 </div>
                 <span className="leave-balance-num">
-                  {Math.max(0, 5 - requestsList.filter((r) => r.leaveType === 'Casual Leave' && r.status === 'Approved').reduce((acc, r) => acc + r.durationDays, 0))} / 5 days
+                  {Math.max(
+                    0,
+                    5 -
+                      requestsList
+                        .filter((r) => r.leaveType === 'Casual Leave' && r.status === 'Approved')
+                        .reduce((acc, r) => acc + r.durationDays, 0),
+                  )}{' '}
+                  / 5 days
                 </span>
               </div>
 
@@ -686,7 +715,10 @@ export function LeaveManagementPage() {
                   <span>Unpaid Leave</span>
                 </div>
                 <span className="leave-balance-num">
-                  {requestsList.filter((r) => r.leaveType === 'Unpaid Leave' && r.status === 'Approved').reduce((acc, r) => acc + r.durationDays, 0)} days taken
+                  {requestsList
+                    .filter((r) => r.leaveType === 'Unpaid Leave' && r.status === 'Approved')
+                    .reduce((acc, r) => acc + r.durationDays, 0)}{' '}
+                  days taken
                 </span>
               </div>
             </div>
@@ -930,7 +962,8 @@ export function LeaveManagementPage() {
                     <option value="">Select Employee...</option>
                     {employeesList.map((e) => (
                       <option key={e.id} value={e.name || `Employee #${e.employeeNumber}`}>
-                        {e.name || `Employee #${e.employeeNumber}`} (EMP{String(e.employeeNumber).padStart(3, '0')})
+                        {e.name || `Employee #${e.employeeNumber}`} (EMP
+                        {String(e.employeeNumber).padStart(3, '0')})
                       </option>
                     ))}
                   </select>
@@ -1075,7 +1108,14 @@ export function LeaveManagementPage() {
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '10px',
+                  fontSize: '12.5px',
+                }}
+              >
                 <div>
                   <span style={{ color: '#64748b' }}>Date Range:</span>
                   <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>

@@ -87,7 +87,8 @@ function GeofenceEmptyHero({ onAddSite }: { onAddSite?: () => void }) {
             <span>Anti-Spoofing</span>
           </div>
           <p>
-            Rejects mobile attendance submissions where device GPS signal accuracy exceeds tolerance.
+            Rejects mobile attendance submissions where device GPS signal accuracy exceeds
+            tolerance.
           </p>
         </div>
         <div className="feature-item">
@@ -135,7 +136,9 @@ function GeofencesWorkspace({ siteId }: { siteId: string }) {
   if (!canRead)
     return (
       <div className="attendance-card">
-        <Denied>Boundary configuration and version reads require All-scoped site read access.</Denied>
+        <Denied>
+          Boundary configuration and version reads require All-scoped site read access.
+        </Denied>
       </div>
     );
 
@@ -220,8 +223,21 @@ function GeofencesWorkspace({ siteId }: { siteId: string }) {
         <QueryState query={query} />
 
         {query.data && !query.isError && (
-          <div style={{ marginTop: '20px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div
+            style={{
+              marginTop: '20px',
+              borderTop: '1px solid var(--color-border-subtle)',
+              paddingTop: '18px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '14px',
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 650, color: '#0f172a' }}>
                 Boundary Configuration ({query.data.asOfDate})
               </h3>
@@ -336,7 +352,8 @@ export function SiteGeofencesPage() {
             Site Boundaries & Geofencing
           </h1>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>
-            Define GPS circular geofence perimeters and radius tolerances for mobile employee check-ins.
+            Define GPS circular geofence perimeters and radius tolerances for mobile employee
+            check-ins.
           </p>
         </div>
 

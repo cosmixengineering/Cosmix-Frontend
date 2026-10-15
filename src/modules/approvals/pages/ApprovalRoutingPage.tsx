@@ -4,7 +4,11 @@ import { SelectInput } from '@/components/forms/SelectInput';
 import { Button } from '@/components/ui/Button';
 import { Denied } from '../../hr/components/Feedback';
 import { RecordView } from '../../hr/components/RecordView';
-import { FinanceNotice, FinanceTabs, TextAreaField } from '../../hr/components/finance/FinanceChrome';
+import {
+  FinanceNotice,
+  FinanceTabs,
+  TextAreaField,
+} from '../../hr/components/finance/FinanceChrome';
 import { useFinanceAction, useFinanceQuery } from '../../hr/hooks/use-finance-queries';
 import { labelDate } from '../../hr/utils/messages';
 import { ApprovalQueryState, ApprovalActionMessage } from '../components/ApprovalFeedback';
@@ -93,8 +97,8 @@ function ApprovalRoutes({ canManage }: { canManage: boolean }) {
           />
         </div>
         <p className="muted">
-          Each stage is published as one immutable version row. A request type becomes routable
-          only when its stages form a contiguous 1..N sequence for the latest version.
+          Each stage is published as one immutable version row. A request type becomes routable only
+          when its stages form a contiguous 1..N sequence for the latest version.
         </p>
         <ApprovalQueryState query={list}>
           {!list.data?.length && (
@@ -170,24 +174,31 @@ function PublishRouteForm({ requestType }: { requestType: string }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     const errors: Record<string, string> = {};
-    if (!codePattern.test(form.code)) errors.code = 'Use 1-30 letters, digits, dot, dash or underscore.';
+    if (!codePattern.test(form.code))
+      errors.code = 'Use 1-30 letters, digits, dot, dash or underscore.';
     const version = Number(form.expectedLatestVersion);
     if (!Number.isInteger(version) || version < 0)
-      errors.expectedLatestVersion = 'Enter the current latest version as a whole number (0 for a new code).';
+      errors.expectedLatestVersion =
+        'Enter the current latest version as a whole number (0 for a new code).';
     const stage = Number(form.stage);
-    if (!Number.isInteger(stage) || stage < 1 || stage > 20) errors.stage = 'Choose a stage from 1 to 20.';
+    if (!Number.isInteger(stage) || stage < 1 || stage > 20)
+      errors.stage = 'Choose a stage from 1 to 20.';
     if (!form.effectiveFrom) errors.effectiveFrom = 'An effective from date is required.';
     if (form.effectiveTo && form.effectiveFrom && form.effectiveTo < form.effectiveFrom)
       errors.effectiveTo = 'The effective to date cannot be before the effective from date.';
     if (!form.reason.trim()) errors.reason = 'A reason is required.';
-    else if (form.reason.length > 1000) errors.reason = 'The reason must be at most 1000 characters.';
+    else if (form.reason.length > 1000)
+      errors.reason = 'The reason must be at most 1000 characters.';
     for (const key of ['staffCategoryId', 'departmentId', 'siteId'] as const) {
-      if (form[key] && !uuidPattern.test(form[key])) errors[key] = 'Enter a valid identifier or leave the field empty.';
+      if (form[key] && !uuidPattern.test(form[key]))
+        errors[key] = 'Enter a valid identifier or leave the field empty.';
     }
     const minimum = form.minimumAmount ? Number(form.minimumAmount) : null;
     const maximum = form.maximumAmount ? Number(form.maximumAmount) : null;
-    if ((minimum !== null && (!Number.isFinite(minimum) || minimum < 0)) ||
-      (maximum !== null && (!Number.isFinite(maximum) || maximum < 0)))
+    if (
+      (minimum !== null && (!Number.isFinite(minimum) || minimum < 0)) ||
+      (maximum !== null && (!Number.isFinite(maximum) || maximum < 0))
+    )
       errors.minimumAmount = 'Amount bounds must be non-negative numbers.';
     else if (minimum !== null && maximum !== null && maximum < minimum)
       errors.maximumAmount = 'The maximum amount cannot be less than the minimum amount.';
@@ -216,8 +227,12 @@ function PublishRouteForm({ requestType }: { requestType: string }) {
         minimumAmount: minimum,
         maximumAmount: maximum,
         currency: form.currency ? form.currency.toUpperCase() : null,
-        minimumDurationMinutes: form.minimumDurationMinutes ? Number(form.minimumDurationMinutes) : null,
-        maximumDurationMinutes: form.maximumDurationMinutes ? Number(form.maximumDurationMinutes) : null,
+        minimumDurationMinutes: form.minimumDurationMinutes
+          ? Number(form.minimumDurationMinutes)
+          : null,
+        maximumDurationMinutes: form.maximumDurationMinutes
+          ? Number(form.maximumDurationMinutes)
+          : null,
         riskCode: form.riskCode || null,
       },
       'POST',
@@ -333,11 +348,7 @@ function PublishRouteForm({ requestType }: { requestType: string }) {
             error={fieldErrors.maximumDurationMinutes}
             onChange={set('maximumDurationMinutes')}
           />
-          <TextInput
-            label="Risk code"
-            value={form.riskCode}
-            onChange={set('riskCode')}
-          />
+          <TextInput label="Risk code" value={form.riskCode} onChange={set('riskCode')} />
         </div>
         <TextAreaField
           label="Reason"
@@ -390,7 +401,8 @@ function ApprovalDelegations() {
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt))
       errors.endsAt = 'The end time must be after the start time.';
     if (!form.reason.trim()) errors.reason = 'A reason is required.';
-    else if (form.reason.length > 1000) errors.reason = 'The reason must be at most 1000 characters.';
+    else if (form.reason.length > 1000)
+      errors.reason = 'The reason must be at most 1000 characters.';
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
     await action.run(
@@ -429,7 +441,9 @@ function ApprovalDelegations() {
       <div className="hr-form-section">
         <h2>My delegations</h2>
         <ApprovalQueryState query={list}>
-          {!list.data?.length && <FinanceNotice>No delegations have been granted from this account.</FinanceNotice>}
+          {!list.data?.length && (
+            <FinanceNotice>No delegations have been granted from this account.</FinanceNotice>
+          )}
           {list.data?.map((delegation) => (
             <article className="hr-repeat" key={delegation.id}>
               <div className="hr-repeat-heading">
@@ -449,7 +463,9 @@ function ApprovalDelegations() {
                   delegateAccountId: delegation.delegateAccountId,
                   requestType: delegation.requestType,
                   permission: delegation.permission,
-                  scopeKind: scopeKindOptions.find((s) => Number(s.value) === delegation.scopeKind)?.label ?? delegation.scopeKind,
+                  scopeKind:
+                    scopeKindOptions.find((s) => Number(s.value) === delegation.scopeKind)?.label ??
+                    delegation.scopeKind,
                   targetId: delegation.targetId,
                   startsAt: labelDate(delegation.startsAt),
                   endsAt: labelDate(delegation.endsAt),
@@ -467,7 +483,11 @@ function ApprovalDelegations() {
                         error={fieldErrors.revokeReason}
                         onChange={setRevokeReason}
                       />
-                      <Button variant="secondary" onClick={() => void revoke(delegation)} disabled={action.pending}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void revoke(delegation)}
+                        disabled={action.pending}
+                      >
                         Confirm revoke
                       </Button>
                       <Button

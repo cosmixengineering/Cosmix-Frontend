@@ -115,8 +115,22 @@ export function AdminLayout() {
         className={`admin-sidebar ${isDark ? 'dark-mode' : ''} ${open ? 'is-open' : ''}`}
         aria-label="Admin Navigation"
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', padding: '2px 4px 10px', gap: '6px' }}>
-          <Link to="/admin/dashboard" className="admin-brand" style={{ borderBottom: 'none', padding: 0 }} onClick={() => setOpen(false)}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid #f1f5f9',
+            padding: '2px 4px 10px',
+            gap: '6px',
+          }}
+        >
+          <Link
+            to="/admin/dashboard"
+            className="admin-brand"
+            style={{ borderBottom: 'none', padding: 0 }}
+            onClick={() => setOpen(false)}
+          >
             <div className="admin-brand-icon">
               <Building2 size={18} />
             </div>
@@ -192,7 +206,15 @@ export function AdminLayout() {
       {/* Main Workspace */}
       <div className="admin-workspace">
         <header className="admin-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '580px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flex: 1,
+              maxWidth: '580px',
+            }}
+          >
             <button
               className="icon-button hr-open-nav"
               ref={menuButton}
@@ -250,9 +272,7 @@ export function AdminLayout() {
 
             {/* User Chip */}
             <Link to="/admin/account" className="admin-user-chip">
-              <div className="admin-user-avatar">
-                {displayName.charAt(0).toUpperCase() || 'A'}
-              </div>
+              <div className="admin-user-avatar">{displayName.charAt(0).toUpperCase() || 'A'}</div>
               <div className="hr-user-info">
                 <span className="hr-user-name">{displayName}</span>
                 <span className="hr-user-role">{roleName}</span>
@@ -282,7 +302,11 @@ export function AdminLayout() {
         </header>
 
         {error && (
-          <p role="alert" className="hr-message hr-message--error" style={{ margin: '16px 36px 0' }}>
+          <p
+            role="alert"
+            className="hr-message hr-message--error"
+            style={{ margin: '16px 36px 0' }}
+          >
             {error}
           </p>
         )}

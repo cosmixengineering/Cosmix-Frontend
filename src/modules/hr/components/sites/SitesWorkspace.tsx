@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Plus,
-  Pencil,
-  History,
-  RefreshCw,
-  MapPin,
-} from 'lucide-react';
+import { Plus, Pencil, History, RefreshCw, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { TextInput } from '@/components/forms/TextInput';
@@ -52,9 +46,25 @@ export function SitesWorkspace() {
     <>
       {/* Clean Flat Header */}
       <div className="sites-list-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
               HUMAN RESOURCES &bull; WORKING SITES
             </div>
             <h1 style={{ margin: '3px 0 0', fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>
@@ -90,7 +100,9 @@ export function SitesWorkspace() {
 
       {/* Toolbar & Filters */}
       <div className="sites-filter-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}
+        >
           <div style={{ minWidth: '220px', flex: 1, maxWidth: '360px' }}>
             <TextInput
               label="Search sites"
@@ -132,7 +144,10 @@ export function SitesWorkspace() {
               }}
             />
           </div>
-          <label className="hr-inline" style={{ marginTop: '22px', fontSize: '13px', color: '#475569', cursor: 'pointer' }}>
+          <label
+            className="hr-inline"
+            style={{ marginTop: '22px', fontSize: '13px', color: '#475569', cursor: 'pointer' }}
+          >
             <input
               type="checkbox"
               checked={descending}

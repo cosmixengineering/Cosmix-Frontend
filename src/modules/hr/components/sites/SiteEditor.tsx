@@ -260,7 +260,11 @@ function SiteForm({
           </p>
         )}
         <div className="hr-actions">
-          <Button type="submit" variant="success" disabled={action.pending || action.reloadRequired}>
+          <Button
+            type="submit"
+            variant="success"
+            disabled={action.pending || action.reloadRequired}
+          >
             <Save size={16} />
             {action.pending ? 'Saving...' : action.locked ? 'Retry unchanged action' : 'Save site'}
           </Button>

@@ -323,7 +323,11 @@ export function SiteNavigation({
 
       {allowed ? (
         <>
-          <QueryState query={query} empty={!query.data?.items.length} emptyText="No matching sites found." />
+          <QueryState
+            query={query}
+            empty={!query.data?.items.length}
+            emptyText="No matching sites found."
+          />
           {!query.data?.items.length && !query.isFetching && (
             <div
               style={{
@@ -370,8 +374,12 @@ export function SiteNavigation({
           )}
         </>
       ) : (
-        <p className="attendance-empty" style={{ fontSize: '12px', textAlign: 'left', padding: '8px 0' }}>
-          Global site catalogue access is restricted. Known assigned site IDs remain available where scheduling grants apply.
+        <p
+          className="attendance-empty"
+          style={{ fontSize: '12px', textAlign: 'left', padding: '8px 0' }}
+        >
+          Global site catalogue access is restricted. Known assigned site IDs remain available where
+          scheduling grants apply.
         </p>
       )}
 

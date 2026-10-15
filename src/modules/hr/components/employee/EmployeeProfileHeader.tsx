@@ -138,8 +138,10 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
   const joinedDate = profile?.joinedOn ? labelDate(profile.joinedOn) : null;
   const employeeNo = employee?.employeeNumber ? `EMP-${employee.employeeNumber}` : null;
 
-  const deptName = deptsQuery.data?.items?.find((d) => d.id === profile?.departmentId)?.name || null;
-  const desigName = desigsQuery.data?.items?.find((d) => d.id === profile?.designationId)?.name || null;
+  const deptName =
+    deptsQuery.data?.items?.find((d) => d.id === profile?.departmentId)?.name || null;
+  const desigName =
+    desigsQuery.data?.items?.find((d) => d.id === profile?.designationId)?.name || null;
   const cnicNumber = profile?.identityDocumentNumber || null;
   const emergencyName = profile?.emergencyContact?.name || null;
   const emergencyPhone = profile?.emergencyContact?.phone || null;
@@ -153,7 +155,7 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
   const isOvertimeActive = Boolean(
     profile?.staffCategoryId ||
     profile?.mobileAccessRequested ||
-    (desigName && /technician|engineer|supervisor|operator|driver|field/i.test(desigName))
+    (desigName && /technician|engineer|supervisor|operator|driver|field/i.test(desigName)),
   );
 
   // Generate initials
@@ -380,8 +382,7 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
                 style={{
                   background:
                     statusIndex === 2 ? '#ecfdf5' : statusIndex === 3 ? '#fef2f2' : '#f8fafc',
-                  color:
-                    statusIndex === 2 ? '#047857' : statusIndex === 3 ? '#b91c1c' : '#475569',
+                  color: statusIndex === 2 ? '#047857' : statusIndex === 3 ? '#b91c1c' : '#475569',
                   border: `1px solid ${statusIndex === 2 ? '#a7f3d0' : statusIndex === 3 ? '#fecaca' : '#e2e8f0'}`,
                   fontSize: '12px',
                   fontWeight: 650,
@@ -433,7 +434,11 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
                   alignItems: 'center',
                   gap: '4px',
                 }}
-                title={isOvertimeActive ? 'Overtime (OT) is Active / Eligible' : 'Overtime (OT) is Ineligible / Off'}
+                title={
+                  isOvertimeActive
+                    ? 'Overtime (OT) is Active / Eligible'
+                    : 'Overtime (OT) is Ineligible / Off'
+                }
               >
                 <Clock size={11} />
                 <span>OT: {isOvertimeActive ? 'ON' : 'OFF'}</span>
@@ -465,7 +470,9 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
               {cnicNumber && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <ShieldCheck size={13} color="#0284c7" />
-                  <span>CNIC: <strong style={{ color: '#0f172a' }}>{cnicNumber}</strong></span>
+                  <span>
+                    CNIC: <strong style={{ color: '#0f172a' }}>{cnicNumber}</strong>
+                  </span>
                 </div>
               )}
 
@@ -526,7 +533,9 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
                 >
                   <PhoneCall size={12} color="#ea580c" />
                   <span>
-                    Emergency: <strong>{emergencyName ? `${emergencyName} ` : ''}</strong>({emergencyPhone}{emergencyRelation ? ` • ${emergencyRelation}` : ''})
+                    Emergency: <strong>{emergencyName ? `${emergencyName} ` : ''}</strong>(
+                    {emergencyPhone}
+                    {emergencyRelation ? ` • ${emergencyRelation}` : ''})
                   </span>
                 </div>
               )}
@@ -534,7 +543,9 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
               {loginPhone && loginPhone !== phone && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Smartphone size={13} color="#059669" />
-                  <span>Login Phone: <strong>+92 {loginPhone}</strong></span>
+                  <span>
+                    Login Phone: <strong>+92 {loginPhone}</strong>
+                  </span>
                 </div>
               )}
 
@@ -608,10 +619,7 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
               onRefresh?.();
             }}
           >
-            <RefreshCw
-              size={15}
-              className={profileQuery.isFetching ? 'animate-spin' : ''}
-            />
+            <RefreshCw size={15} className={profileQuery.isFetching ? 'animate-spin' : ''} />
           </Button>
         </div>
       </div>
@@ -629,7 +637,10 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
         title="Update Profile Photo"
         description={`Upload an official clear portrait of ${fullName}.`}
       >
-        <form onSubmit={handleUploadPhoto} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <form
+          onSubmit={handleUploadPhoto}
+          style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}
+        >
           <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
             Upload an official clear portrait of <strong>{fullName}</strong>. Supported formats:
             JPG, PNG, or WebP up to 10MB.
@@ -735,7 +746,9 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
           )}
 
           {/* Dialog Action Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+          <div
+            style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -747,11 +760,7 @@ export function EmployeeProfileHeader({ employeeId, onRefresh }: EmployeeProfile
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!selectedFile || action.pending}
-            >
+            <Button type="submit" variant="primary" disabled={!selectedFile || action.pending}>
               <Upload size={14} style={{ marginRight: '6px' }} />
               {action.pending ? 'Uploading...' : 'Save & Set Photo'}
             </Button>

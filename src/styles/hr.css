@@ -241,7 +241,10 @@
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  transition: margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .hr-shell.is-collapsed .hr-workspace {
   margin-left: 52px;

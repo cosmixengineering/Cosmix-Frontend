@@ -236,7 +236,10 @@ export function AdminDashboardPage() {
         <div className="admin-modules-grid">
           {erpModules.map((mod) => (
             <Link key={mod.title} to={mod.to} className="admin-module-card">
-              <div className="admin-module-card-icon" style={{ background: mod.bg, color: mod.color }}>
+              <div
+                className="admin-module-card-icon"
+                style={{ background: mod.bg, color: mod.color }}
+              >
                 <mod.icon size={22} />
               </div>
               <div className="admin-module-card-body">
@@ -323,7 +326,10 @@ export function AdminDashboardPage() {
           <div className="admin-approvals-list">
             <Link to="/admin/approvals?type=leave" className="admin-approval-row">
               <div className="admin-approval-left">
-                <div className="admin-approval-icon" style={{ background: '#fdf2f8', color: '#db2777' }}>
+                <div
+                  className="admin-approval-icon"
+                  style={{ background: '#fdf2f8', color: '#db2777' }}
+                >
                   <Users size={15} />
                 </div>
                 <span className="admin-approval-name">5 Leave Requests</span>
@@ -333,7 +339,10 @@ export function AdminDashboardPage() {
 
             <Link to="/admin/approvals?type=po" className="admin-approval-row">
               <div className="admin-approval-left">
-                <div className="admin-approval-icon" style={{ background: '#fffbeb', color: '#d97706' }}>
+                <div
+                  className="admin-approval-icon"
+                  style={{ background: '#fffbeb', color: '#d97706' }}
+                >
                   <ShoppingCart size={15} />
                 </div>
                 <span className="admin-approval-name">3 Purchase Orders</span>
@@ -343,7 +352,10 @@ export function AdminDashboardPage() {
 
             <Link to="/admin/approvals?type=expense" className="admin-approval-row">
               <div className="admin-approval-left">
-                <div className="admin-approval-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                <div
+                  className="admin-approval-icon"
+                  style={{ background: '#eff6ff', color: '#2563eb' }}
+                >
                   <CreditCard size={15} />
                 </div>
                 <span className="admin-approval-name">4 Expense Claims</span>
@@ -353,7 +365,10 @@ export function AdminDashboardPage() {
 
             <Link to="/admin/approvals?type=project" className="admin-approval-row">
               <div className="admin-approval-left">
-                <div className="admin-approval-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+                <div
+                  className="admin-approval-icon"
+                  style={{ background: '#f0fdf4', color: '#16a34a' }}
+                >
                   <Briefcase size={15} />
                 </div>
                 <span className="admin-approval-name">2 Project Proposals</span>

@@ -18,11 +18,15 @@
   background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
   color: #ffffff;
   border-color: #1e3a8a;
-  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 1px 2px 0 rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
 }
 .button--primary:hover:not(:disabled) {
   background: linear-gradient(180deg, #1e40af 0%, #172554 100%);
-  box-shadow: 0 3px 6px -1px rgba(30, 58, 138, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 3px 6px -1px rgba(30, 58, 138, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
   transform: translateY(-0.5px);
 }
 .button--primary:active:not(:disabled) {
@@ -33,11 +37,15 @@
   background: linear-gradient(180deg, #10b981 0%, #059669 100%);
   color: #ffffff;
   border-color: #047857;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
 }
 .button--success:hover:not(:disabled) {
   background: linear-gradient(180deg, #059669 0%, #047857 100%);
-  box-shadow: 0 3px 8px -1px rgba(5, 150, 105, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 3px 8px -1px rgba(5, 150, 105, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
   transform: translateY(-0.5px);
 }
 .button--success:active:not(:disabled) {
@@ -48,11 +56,15 @@
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
   color: #ffffff;
   border-color: #0f172a;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.12), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
 }
 .button--slate:hover:not(:disabled) {
   background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
-  box-shadow: 0 3px 8px -1px rgba(15, 23, 42, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 3px 8px -1px rgba(15, 23, 42, 0.3),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
   transform: translateY(-0.5px);
 }
 .button--slate:active:not(:disabled) {
@@ -281,15 +293,15 @@ td:last-child {
   font-weight: 700;
   margin-left: 2px;
 }
-.field input[aria-invalid="true"],
-.field select[aria-invalid="true"],
-.field textarea[aria-invalid="true"] {
+.field input[aria-invalid='true'],
+.field select[aria-invalid='true'],
+.field textarea[aria-invalid='true'] {
   border-color: #ef4444 !important;
   background-color: #fef2f2;
 }
-.field input[aria-invalid="true"]:focus,
-.field select[aria-invalid="true"]:focus,
-.field textarea[aria-invalid="true"]:focus {
+.field input[aria-invalid='true']:focus,
+.field select[aria-invalid='true']:focus,
+.field textarea[aria-invalid='true']:focus {
   outline: none;
   border-color: #ef4444 !important;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
@@ -331,7 +343,7 @@ td:last-child {
   flex: 1;
 }
 
-.phone-input-group[data-invalid="true"] .phone-prefix-addon {
+.phone-input-group[data-invalid='true'] .phone-prefix-addon {
   border-color: #ef4444;
   background-color: #fef2f2;
   color: #dc2626;
@@ -400,7 +412,9 @@ td:last-child {
   padding: 28px 24px 22px !important;
   border-radius: 18px !important;
   border: 1px solid rgba(226, 232, 240, 0.9) !important;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05) !important;
+  box-shadow:
+    0 25px 50px -12px rgba(15, 23, 42, 0.25),
+    0 0 0 1px rgba(15, 23, 42, 0.05) !important;
   position: fixed !important;
   left: 50% !important;
   top: 50% !important;

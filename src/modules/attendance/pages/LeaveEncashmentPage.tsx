@@ -127,7 +127,8 @@ function MyEncashments({ canSubmit }: { canSubmit: boolean }) {
     if (form.leaveYearStart && form.leaveYearEnd && form.leaveYearEnd < form.leaveYearStart)
       errors.leaveYearEnd = 'The leave year end cannot be before the start.';
     if (!form.reason.trim()) errors.reason = 'A reason is required.';
-    else if (form.reason.length > 1000) errors.reason = 'The reason must be at most 1000 characters.';
+    else if (form.reason.length > 1000)
+      errors.reason = 'The reason must be at most 1000 characters.';
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
     await action.run(
@@ -332,7 +333,11 @@ function EncashmentQueue({ canDecide }: { canDecide: boolean }) {
                     />
                     {fieldErrors.reason && <p className="field-error">{fieldErrors.reason}</p>}
                   </label>
-                  <Button variant="secondary" onClick={() => void decide(item)} disabled={action.pending}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void decide(item)}
+                    disabled={action.pending}
+                  >
                     {action.pending ? 'Recording...' : 'Record decision'}
                   </Button>
                   <Button

@@ -67,11 +67,9 @@ export function WorkflowRequests({
   );
 
   // Fetch employees directory to map IDs to real names & codes
-  const employeesQuery = useHrQuery(
-    'employees?pageSize=100',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
 
   const employeeMap = useMemo(() => {
     const map = new Map<string, EmployeeSummary>();
@@ -154,9 +152,9 @@ export function WorkflowRequests({
             </div>
             <h3 className="hr-requests-empty-title">No {name} Requests Found</h3>
             <p className="hr-requests-empty-text">
-              There are currently no {name.toLowerCase()} requests matching the active filter.
-              When employees or HR admins submit lifecycle transitions or salary adjustments,
-              they will appear here for audit and approval.
+              There are currently no {name.toLowerCase()} requests matching the active filter. When
+              employees or HR admins submit lifecycle transitions or salary adjustments, they will
+              appear here for audit and approval.
             </p>
           </div>
         ) : (
@@ -180,9 +178,7 @@ export function WorkflowRequests({
               return (
                 <article className="hr-request-card" key={r.id}>
                   <div className="hr-request-card-left">
-                    <div className="hr-request-avatar">
-                      {initials}
-                    </div>
+                    <div className="hr-request-avatar">{initials}</div>
                     <div className="hr-request-info">
                       <div className="hr-request-emp-name">
                         <span>{empName}</span>
@@ -335,10 +331,10 @@ function WorkflowRequestDetail({
                 query.data.request.state === 1
                   ? 'hr-status-pill--approved'
                   : query.data.request.state === 3
-                  ? 'hr-status-pill--rejected'
-                  : query.data.request.state === 2
-                  ? 'hr-status-pill--returned'
-                  : 'hr-status-pill--pending'
+                    ? 'hr-status-pill--rejected'
+                    : query.data.request.state === 2
+                      ? 'hr-status-pill--returned'
+                      : 'hr-status-pill--pending'
               }`}
             >
               {approvalLabels[query.data.request.state]}
@@ -365,7 +361,9 @@ function WorkflowRequestDetail({
               <div className="hr-req-diff-card hr-req-diff-card--proposed">
                 <div className="hr-req-diff-title">Proposed New Compensation</div>
                 <CompensationView terms={query.data.proposed} />
-                <div style={{ marginTop: '10px', fontSize: '12px', color: '#059669', fontWeight: 600 }}>
+                <div
+                  style={{ marginTop: '10px', fontSize: '12px', color: '#059669', fontWeight: 600 }}
+                >
                   Effective from: {query.data.effectiveFrom}
                 </div>
               </div>
@@ -431,7 +429,13 @@ function WorkflowRequestDetail({
                       borderRadius: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <strong style={{ fontSize: '13px', color: '#0f172a' }}>
                         {approvalLabels[d.decision]}
                       </strong>

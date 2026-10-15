@@ -20,7 +20,11 @@ export function CirclePreview({
     radiusMeters <= 0 ||
     maximumAccuracyMeters <= 0
   )
-    return <p className="attendance-error">Enter valid circular boundary coordinates and radius values.</p>;
+    return (
+      <p className="attendance-error">
+        Enter valid circular boundary coordinates and radius values.
+      </p>
+    );
 
   return (
     <div className="attendance-preview">
@@ -57,9 +61,7 @@ export function CirclePreview({
             <Target size={12} />
             Calibrated GPS Perimeter
           </span>
-          <span style={{ fontSize: '11.5px', color: '#64748b' }}>
-            Schematic preview
-          </span>
+          <span style={{ fontSize: '11.5px', color: '#64748b' }}>Schematic preview</span>
         </div>
 
         <div className="attendance-metric-grid">
@@ -81,9 +83,20 @@ export function CirclePreview({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748b' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            color: '#64748b',
+          }}
+        >
           <ShieldCheck size={14} style={{ color: '#10b981' }} />
-          <span>Mobile clock-ins outside this perimeter or with accuracy &gt; {maximumAccuracyMeters}m are rejected.</span>
+          <span>
+            Mobile clock-ins outside this perimeter or with accuracy &gt; {maximumAccuracyMeters}m
+            are rejected.
+          </span>
         </div>
       </div>
     </div>

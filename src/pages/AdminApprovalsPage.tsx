@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import {
-  ClipboardCheck,
-  CheckCircle2,
-  XCircle,
-  Search,
-  ArrowLeft,
-} from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, XCircle, Search, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 interface ApprovalItem {
@@ -293,7 +287,15 @@ export function AdminApprovalsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
       {/* Header Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '14px',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link
             to="/admin/dashboard"
@@ -324,27 +326,82 @@ export function AdminApprovalsPage() {
 
         {/* Counter Pills */}
         <div style={{ display: 'flex', gap: '10px' }}>
-          <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 14px', borderRadius: '8px', fontSize: '12.5px', color: '#b45309', fontWeight: 600 }}>
+          <div
+            style={{
+              background: '#fffbeb',
+              border: '1px solid #fef3c7',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              color: '#b45309',
+              fontWeight: 600,
+            }}
+          >
             Pending: {pendingCount}
           </div>
-          <div style={{ background: '#f0fdf4', border: '1px solid #dcfce7', padding: '6px 14px', borderRadius: '8px', fontSize: '12.5px', color: '#15803d', fontWeight: 600 }}>
+          <div
+            style={{
+              background: '#f0fdf4',
+              border: '1px solid #dcfce7',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              color: '#15803d',
+              fontWeight: 600,
+            }}
+          >
             Approved: {approvedCount}
           </div>
-          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', padding: '6px 14px', borderRadius: '8px', fontSize: '12.5px', color: '#b91c1c', fontWeight: 600 }}>
+          <div
+            style={{
+              background: '#fef2f2',
+              border: '1px solid #fee2e2',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              color: '#b91c1c',
+              fontWeight: 600,
+            }}
+          >
             Rejected: {rejectedCount}
           </div>
         </div>
       </div>
 
       {actionMessage && (
-        <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '12px 18px', borderRadius: '8px', color: '#065f46', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div
+          style={{
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            padding: '12px 18px',
+            borderRadius: '8px',
+            color: '#065f46',
+            fontSize: '13px',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
           <CheckCircle2 size={18} style={{ color: '#10b981' }} />
           <span>{actionMessage}</span>
         </div>
       )}
 
       {/* Filter Tabs & Search */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '14px',
+          background: '#ffffff',
+          padding: '12px 16px',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+        }}
+      >
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
             { key: 'all', label: `All (${items.length})` },
@@ -377,14 +434,32 @@ export function AdminApprovalsPage() {
         </div>
 
         {/* Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 12px', minWidth: '240px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            minWidth: '240px',
+          }}
+        >
           <Search size={15} style={{ color: '#94a3b8' }} />
           <input
             type="text"
             placeholder="Search approvals..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px', width: '100%', color: '#0f172a' }}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              outline: 'none',
+              fontSize: '13px',
+              width: '100%',
+              color: '#0f172a',
+            }}
           />
         </div>
       </div>
@@ -409,8 +484,18 @@ export function AdminApprovalsPage() {
                 opacity: item.status !== 'pending' ? 0.75 : 1,
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}
+                >
                   <span
                     style={{
                       background: badge.bg,
@@ -440,7 +525,9 @@ export function AdminApprovalsPage() {
                   </span>
                 </div>
 
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: '2px 0 0' }}>
+                <h3
+                  style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: '2px 0 0' }}
+                >
                   {item.title}
                 </h3>
 
@@ -448,13 +535,24 @@ export function AdminApprovalsPage() {
                   {item.details}
                 </p>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginTop: '4px', fontSize: '12px', color: '#64748b' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '18px',
+                    marginTop: '4px',
+                    fontSize: '12px',
+                    color: '#64748b',
+                  }}
+                >
                   <span>
                     <strong>Requester:</strong> {item.requester} ({item.department})
                   </span>
                   <span>
                     <strong>Value:</strong>{' '}
-                    <span style={{ color: '#0f172a', fontWeight: 600 }}>{item.amountOrDuration}</span>
+                    <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                      {item.amountOrDuration}
+                    </span>
                   </span>
                   <span>
                     <strong>Submitted:</strong> {item.date}
@@ -548,9 +646,19 @@ export function AdminApprovalsPage() {
         })}
 
         {filteredItems.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '48px 20px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '48px 20px',
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+            }}
+          >
             <ClipboardCheck size={36} style={{ color: '#94a3b8', margin: '0 auto 10px' }} />
-            <h3 style={{ fontSize: '15px', color: '#0f172a', margin: '0 0 4px' }}>No approvals found</h3>
+            <h3 style={{ fontSize: '15px', color: '#0f172a', margin: '0 0 4px' }}>
+              No approvals found
+            </h3>
             <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
               There are no pending approval requests matching your search criteria.
             </p>

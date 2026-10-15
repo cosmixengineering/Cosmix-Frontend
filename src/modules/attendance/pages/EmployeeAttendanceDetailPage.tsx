@@ -198,12 +198,14 @@ export function EmployeeAttendanceDetailPage() {
   const profileQuery = useHrQuery(
     employeeId ? `employees/${employeeId}` : 'employees/placeholder',
     profileResponse,
-    ['hr.employees.read']
+    ['hr.employees.read'],
   );
 
   const dossier = useMemo(() => {
     const p = profileQuery.data?.profile;
-    const e = profileQuery.data?.employee || employeesQuery.data?.items?.find((item) => item.id === employeeId);
+    const e =
+      profileQuery.data?.employee ||
+      employeesQuery.data?.items?.find((item) => item.id === employeeId);
 
     const name = p?.fullLegalName || e?.name || (e ? `Employee #${e.employeeNumber}` : 'Employee');
     const code = e ? `EMP${String(e.employeeNumber).padStart(3, '0')}` : 'EMP001';
@@ -225,15 +227,26 @@ export function EmployeeAttendanceDetailPage() {
     // Contact & Residence
     const personalPhone = p?.personalPhone || p?.loginPhoneNumber || '+92 301 2345678';
     const companyPhone = p?.companyPhone || '+92 21 34567890 (Ext: 204)';
-    const officialEmail = p?.officialEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@cosmixerp.com`;
-    const personalEmail = p?.personalEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
+    const officialEmail =
+      p?.officialEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@cosmixerp.com`;
+    const personalEmail =
+      p?.personalEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
 
     const currAddr = p?.currentAddress
-      ? [p.currentAddress.line1, p.currentAddress.line2, p.currentAddress.city, p.currentAddress.province].filter(Boolean).join(', ')
+      ? [
+          p.currentAddress.line1,
+          p.currentAddress.line2,
+          p.currentAddress.city,
+          p.currentAddress.province,
+        ]
+          .filter(Boolean)
+          .join(', ')
       : 'Flat 402, Block 13-D, Gulshan-e-Iqbal, Karachi';
 
     const permAddr = p?.permanentAddress
-      ? [p.permanentAddress.line1, p.permanentAddress.city, p.permanentAddress.province].filter(Boolean).join(', ')
+      ? [p.permanentAddress.line1, p.permanentAddress.city, p.permanentAddress.province]
+          .filter(Boolean)
+          .join(', ')
       : 'House 12, Street 4, Satellite Town, Rawalpindi';
 
     // Job & Employment
@@ -408,7 +421,9 @@ export function EmployeeAttendanceDetailPage() {
           </div>
           <div className="att-emergency-highlight">
             <div>
-              <div style={{ fontSize: '10px', color: '#c2410c', fontWeight: 600 }}>Emergency Call Line:</div>
+              <div style={{ fontSize: '10px', color: '#c2410c', fontWeight: 600 }}>
+                Emergency Call Line:
+              </div>
               <div className="att-emergency-highlight-phone">{dossier.emergencyPhone}</div>
             </div>
             <a
@@ -436,7 +451,10 @@ export function EmployeeAttendanceDetailPage() {
           <div className="att-dossier-rows">
             <div className="att-dossier-row">
               <span className="att-dossier-label">CNIC / ID:</span>
-              <span className="att-dossier-value" style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }}>
+              <span
+                className="att-dossier-value"
+                style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }}
+              >
                 {dossier.cnic}
               </span>
             </div>
@@ -450,7 +468,9 @@ export function EmployeeAttendanceDetailPage() {
             </div>
             <div className="att-dossier-row">
               <span className="att-dossier-label">Gender / Status:</span>
-              <span className="att-dossier-value">{dossier.gender} • {dossier.maritalStatus}</span>
+              <span className="att-dossier-value">
+                {dossier.gender} • {dossier.maritalStatus}
+              </span>
             </div>
             <div className="att-dossier-row">
               <span className="att-dossier-label">Biometrics:</span>
@@ -483,15 +503,21 @@ export function EmployeeAttendanceDetailPage() {
             </div>
             <div className="att-dossier-row">
               <span className="att-dossier-label">Official Email:</span>
-              <span className="att-dossier-value" style={{ fontSize: '11px' }}>{dossier.officialEmail}</span>
+              <span className="att-dossier-value" style={{ fontSize: '11px' }}>
+                {dossier.officialEmail}
+              </span>
             </div>
             <div className="att-dossier-row">
               <span className="att-dossier-label">Current Address:</span>
-              <span className="att-dossier-value" style={{ fontSize: '10.5px' }}>{dossier.currAddr}</span>
+              <span className="att-dossier-value" style={{ fontSize: '10.5px' }}>
+                {dossier.currAddr}
+              </span>
             </div>
             <div className="att-dossier-row">
               <span className="att-dossier-label">Permanent:</span>
-              <span className="att-dossier-value" style={{ fontSize: '10.5px' }}>{dossier.permAddr}</span>
+              <span className="att-dossier-value" style={{ fontSize: '10.5px' }}>
+                {dossier.permAddr}
+              </span>
             </div>
           </div>
         </div>
@@ -503,7 +529,9 @@ export function EmployeeAttendanceDetailPage() {
               <Clock size={13} style={{ color: '#8b5cf6' }} />
               Job & Overtime Setup
             </h4>
-            <span className={`att-dossier-badge ${isOvertimeEnabled ? 'badge-ot-on' : 'badge-ot-off'}`}>
+            <span
+              className={`att-dossier-badge ${isOvertimeEnabled ? 'badge-ot-on' : 'badge-ot-off'}`}
+            >
               {isOvertimeEnabled ? 'OT ON' : 'OT OFF'}
             </span>
           </div>
@@ -526,7 +554,10 @@ export function EmployeeAttendanceDetailPage() {
             </div>
             <div className="att-dossier-row">
               <span className="att-dossier-label">OT Policy / Rate:</span>
-              <span className="att-dossier-value" style={{ color: isOvertimeEnabled ? '#15803d' : '#64748b' }}>
+              <span
+                className="att-dossier-value"
+                style={{ color: isOvertimeEnabled ? '#15803d' : '#64748b' }}
+              >
                 {isOvertimeEnabled ? '1.5x Standard Hourly' : 'Exempt (No OT Pay)'}
               </span>
             </div>
@@ -535,7 +566,13 @@ export function EmployeeAttendanceDetailPage() {
           {/* Interactive Live Overtime Switch */}
           <div className="att-ot-card-toggle">
             <div>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: isOvertimeEnabled ? '#15803d' : '#475569' }}>
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: isOvertimeEnabled ? '#15803d' : '#475569',
+                }}
+              >
                 Overtime: {isOvertimeEnabled ? 'ON (Active)' : 'OFF (Exempt)'}
               </div>
               <div style={{ fontSize: '9.5px', color: '#64748b' }}>
@@ -664,8 +701,12 @@ export function EmployeeAttendanceDetailPage() {
               }}
             >
               <div>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>CHECK-IN TIME</span>
-                <div style={{ fontSize: '18px', fontWeight: 750, color: '#15803d', marginTop: '2px' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+                  CHECK-IN TIME
+                </span>
+                <div
+                  style={{ fontSize: '18px', fontWeight: 750, color: '#15803d', marginTop: '2px' }}
+                >
                   {activeLog.checkIn || '-'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#166534', marginTop: '2px' }}>
@@ -674,8 +715,12 @@ export function EmployeeAttendanceDetailPage() {
               </div>
 
               <div>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>CHECK-OUT TIME</span>
-                <div style={{ fontSize: '18px', fontWeight: 750, color: '#0f172a', marginTop: '2px' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+                  CHECK-OUT TIME
+                </span>
+                <div
+                  style={{ fontSize: '18px', fontWeight: 750, color: '#0f172a', marginTop: '2px' }}
+                >
                   {activeLog.checkOut || '-'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#166534', marginTop: '2px' }}>
@@ -684,22 +729,52 @@ export function EmployeeAttendanceDetailPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid #f1f5f9',
+                  paddingBottom: '6px',
+                }}
+              >
                 <span style={{ color: '#64748b' }}>Assigned Shift:</span>
                 <span style={{ fontWeight: 600, color: '#0f172a' }}>{activeLog.shift}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid #f1f5f9',
+                  paddingBottom: '6px',
+                }}
+              >
                 <span style={{ color: '#64748b' }}>Worked Duration:</span>
                 <span style={{ fontWeight: 600, color: '#0f172a' }}>{activeLog.hoursWorked}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid #f1f5f9',
+                  paddingBottom: '6px',
+                }}
+              >
                 <span style={{ color: '#64748b' }}>Geofence Verification:</span>
                 <span style={{ fontWeight: 600, color: '#166534' }}>
                   ✓ Within boundary ({activeLog.distanceMeters ?? 14}m from center)
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid #f1f5f9',
+                  paddingBottom: '6px',
+                }}
+              >
                 <span style={{ color: '#64748b' }}>GPS Coordinates:</span>
                 <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#334155' }}>
                   24.8607° N, 67.0011° E
@@ -854,8 +929,8 @@ export function EmployeeAttendanceDetailPage() {
           </div>
 
           <p style={{ fontSize: '11.5px', color: '#64748b', margin: '10px 0 0 0' }}>
-            Biometric and satellite telemetry verified that the employee was physically present within
-            the approved perimeter coordinates during daily check-in.
+            Biometric and satellite telemetry verified that the employee was physically present
+            within the approved perimeter coordinates during daily check-in.
           </p>
         </div>
       </div>

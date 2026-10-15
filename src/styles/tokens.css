@@ -1,6 +1,7 @@
 :root {
   /* Modern High-Grade Typography Stack */
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: #1e293b;
   background: #f8fafc;
   font-synthesis: none;
@@ -77,8 +78,11 @@
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.07);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
-  --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
-  --shadow-card-hover: 0 0 0 1px rgba(37, 99, 235, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 8px 24px -4px rgba(37, 99, 235, 0.05);
+  --shadow-card:
+    0 0 0 1px rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover:
+    0 0 0 1px rgba(37, 99, 235, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.08),
+    0 8px 24px -4px rgba(37, 99, 235, 0.05);
   --shadow-radar: 0 0 30px rgba(16, 185, 129, 0.15);
 
   /* Transitions */

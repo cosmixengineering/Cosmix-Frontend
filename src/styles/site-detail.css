@@ -109,7 +109,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .site-metric-card:hover {

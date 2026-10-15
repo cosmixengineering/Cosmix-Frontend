@@ -11,7 +11,12 @@ export function TextInput({
     <div className="field">
       <label htmlFor={inputId}>
         {label}
-        {props.required && <span className="hr-required-mark" aria-hidden="true"> *</span>}
+        {props.required && (
+          <span className="hr-required-mark" aria-hidden="true">
+            {' '}
+            *
+          </span>
+        )}
       </label>
       <input
         {...props}

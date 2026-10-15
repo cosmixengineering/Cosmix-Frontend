@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ArrowRight, Building2, CheckCircle2, Info, MapPin, Plus, Save, Trash2 } from 'lucide-react';
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  Info,
+  MapPin,
+  Plus,
+  Save,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SelectInput } from '@/components/forms/SelectInput';
 import { useHrAction, useHrQuery } from '../../hooks/use-hr-queries';
@@ -158,7 +167,8 @@ function validateProfile(data: Profile, isOfficeCategory: boolean): Record<strin
     errors.designationId = 'Designation is required.';
   }
   if (!data.staffCategoryId) {
-    errors.staffCategoryId = 'Please select Workplace Placement (Office Based Staff or Site / Field Operations).';
+    errors.staffCategoryId =
+      'Please select Workplace Placement (Office Based Staff or Site / Field Operations).';
   }
   if (!data.employmentTypeId) {
     errors.employmentTypeId = 'Employment type is required.';
@@ -260,11 +270,9 @@ export function ProfileForm({
     ['hr.organization.read'],
     !!data.staffCategoryId,
   );
-  const allCategoriesQuery = useHrQuery(
-    'staff-categories?pageSize=50',
-    pageOf(masterSchema),
-    ['hr.organization.read'],
-  );
+  const allCategoriesQuery = useHrQuery('staff-categories?pageSize=50', pageOf(masterSchema), [
+    'hr.organization.read',
+  ]);
 
   const categories = allCategoriesQuery.data?.items ?? [];
   const officeCategory =
@@ -287,9 +295,17 @@ export function ProfileForm({
   const [placementPref, setPlacementPref] = useState<'office' | 'site' | null>(null);
 
   useEffect(() => {
-    if (placementPref === 'office' && officeCategory && data.staffCategoryId !== officeCategory.id) {
+    if (
+      placementPref === 'office' &&
+      officeCategory &&
+      data.staffCategoryId !== officeCategory.id
+    ) {
       setData((p) => ({ ...p, staffCategoryId: officeCategory.id }));
-    } else if (placementPref === 'site' && siteCategory && data.staffCategoryId !== siteCategory.id) {
+    } else if (
+      placementPref === 'site' &&
+      siteCategory &&
+      data.staffCategoryId !== siteCategory.id
+    ) {
       setData((p) => ({ ...p, staffCategoryId: siteCategory.id, branchId: null }));
     }
   }, [placementPref, officeCategory, siteCategory, data.staffCategoryId]);
@@ -300,7 +316,9 @@ export function ProfileForm({
     (!!officeCategory && data.staffCategoryId === officeCategory.id);
   const isSite =
     placementPref === 'site' ||
-    (category.data?.code && (category.data.code.toUpperCase() === 'SITE' || category.data.code.toUpperCase() === 'FIELD')) ||
+    (category.data?.code &&
+      (category.data.code.toUpperCase() === 'SITE' ||
+        category.data.code.toUpperCase() === 'FIELD')) ||
     (!!siteCategory && data.staffCategoryId === siteCategory.id);
 
   const set = <K extends keyof Profile>(key: K, value: Profile[K]) => {
@@ -357,13 +375,9 @@ export function ProfileForm({
       }}
     >
       {Object.keys(errors).length > 0 && (
-        <div
-          className="hr-message hr-message--error"
-          role="alert"
-          style={{ marginBottom: '20px' }}
-        >
-          <strong>Mandatory fields required:</strong> Please fill in all required fields marked
-          with * before saving ({Object.keys(errors).length} missing or invalid).
+        <div className="hr-message hr-message--error" role="alert" style={{ marginBottom: '20px' }}>
+          <strong>Mandatory fields required:</strong> Please fill in all required fields marked with
+          * before saving ({Object.keys(errors).length} missing or invalid).
         </div>
       )}
       <fieldset disabled={!editable || action.pending}>
@@ -547,8 +561,8 @@ export function ProfileForm({
               fontSize: '13px',
             }}
           >
-            Specify whether this employee will be based in a registered office branch or deployed
-            to active field/construction sites.
+            Specify whether this employee will be based in a registered office branch or deployed to
+            active field/construction sites.
           </p>
           <div className="workplace-placement-grid" style={{ gridColumn: '1 / -1' }}>
             <div
@@ -569,7 +583,8 @@ export function ProfileForm({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   setPlacementPref('office');
-                  if (officeCategory) setData((p) => ({ ...p, staffCategoryId: officeCategory.id }));
+                  if (officeCategory)
+                    setData((p) => ({ ...p, staffCategoryId: officeCategory.id }));
                 }
               }}
             >
@@ -582,7 +597,8 @@ export function ProfileForm({
                   {isOffice && <CheckCircle2 size={16} color="#2563eb" />}
                 </h3>
                 <p>
-                  Stationed at a company office / branch. Requires an office branch selection for daily attendance & desk assignments.
+                  Stationed at a company office / branch. Requires an office branch selection for
+                  daily attendance & desk assignments.
                 </p>
               </div>
             </div>
@@ -606,7 +622,8 @@ export function ProfileForm({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   setPlacementPref('site');
-                  if (siteCategory) setData((p) => ({ ...p, staffCategoryId: siteCategory.id, branchId: null }));
+                  if (siteCategory)
+                    setData((p) => ({ ...p, staffCategoryId: siteCategory.id, branchId: null }));
                 }
               }}
             >
@@ -619,7 +636,8 @@ export function ProfileForm({
                   {isSite && <CheckCircle2 size={16} color="#2563eb" />}
                 </h3>
                 <p>
-                  Field & project site deployment. No office branch needed. Active project site, geofencing & shift assigned by Admin.
+                  Field & project site deployment. No office branch needed. Active project site,
+                  geofencing & shift assigned by Admin.
                 </p>
               </div>
             </div>
@@ -671,7 +689,9 @@ export function ProfileForm({
               <div>
                 <strong>Site Staff Deployment Mode Activated:</strong>
                 <p style={{ margin: '4px 0 0' }}>
-                  Is employee ka koi office branch nahi hoga. Profile submit hone k baad <strong>Admin Dashboard</strong> se isko active site boundaries, GPS geofencing aur site supervisor roster assign kiye jaayenge.
+                  Is employee ka koi office branch nahi hoga. Profile submit hone k baad{' '}
+                  <strong>Admin Dashboard</strong> se isko active site boundaries, GPS geofencing
+                  aur site supervisor roster assign kiye jaayenge.
                 </p>
               </div>
             </div>
@@ -878,9 +898,7 @@ export function ProfileForm({
           <h2>Certifications</h2>
           {data.certifications.map((row, i) => {
             const update = (patch: Partial<typeof row>) => {
-              const updated = data.certifications.map((r, n) =>
-                n === i ? { ...r, ...patch } : r,
-              );
+              const updated = data.certifications.map((r, n) => (n === i ? { ...r, ...patch } : r));
               set('certifications', updated);
             };
             return (

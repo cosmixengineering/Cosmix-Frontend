@@ -22,7 +22,9 @@ export function AccountPage() {
   }
 
   const displayName = user?.account?.displayName || 'User Profile';
-  const roleName = user?.grants.some((g: { permission: string }) => g.permission.startsWith('admin.'))
+  const roleName = user?.grants.some((g: { permission: string }) =>
+    g.permission.startsWith('admin.'),
+  )
     ? 'System Administrator'
     : 'HR Officer / Employee';
 
@@ -103,15 +105,44 @@ export function AccountPage() {
             paddingTop: '12px',
           }}
         >
-          <div style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '10.5px', color: '#64748b', display: 'block' }}>Web Access</span>
-            <strong style={{ fontSize: '12px', color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+          <div
+            style={{
+              padding: '8px 10px',
+              background: '#f8fafc',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <span style={{ fontSize: '10.5px', color: '#64748b', display: 'block' }}>
+              Web Access
+            </span>
+            <strong
+              style={{
+                fontSize: '12px',
+                color: '#0f172a',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginTop: '2px',
+              }}
+            >
               <CheckCircle2 size={13} style={{ color: '#16a34a' }} /> Enabled
             </strong>
           </div>
-          <div style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '10.5px', color: '#64748b', display: 'block' }}>Verification & Credentials</span>
-            <strong style={{ fontSize: '12px', color: '#0f172a', marginTop: '2px', display: 'block' }}>
+          <div
+            style={{
+              padding: '8px 10px',
+              background: '#f8fafc',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <span style={{ fontSize: '10.5px', color: '#64748b', display: 'block' }}>
+              Verification & Credentials
+            </span>
+            <strong
+              style={{ fontSize: '12px', color: '#0f172a', marginTop: '2px', display: 'block' }}
+            >
               Active Password & Session SMS
             </strong>
           </div>
@@ -123,7 +154,16 @@ export function AccountPage() {
           </p>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexWrap: 'wrap',
+            borderTop: '1px solid #f1f5f9',
+            paddingTop: '12px',
+          }}
+        >
           <Link
             className="button button--secondary"
             to="/account/sessions"

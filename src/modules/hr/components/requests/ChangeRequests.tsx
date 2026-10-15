@@ -68,11 +68,9 @@ export function ChangeRequests({
   );
 
   // Fetch employees directory to map IDs to real names & codes
-  const employeesQuery = useHrQuery(
-    'employees?pageSize=100',
-    pageOf(employeeSchema),
-    ['hr.employees.read'],
-  );
+  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
+    'hr.employees.read',
+  ]);
 
   const employeeMap = useMemo(() => {
     const map = new Map<string, EmployeeSummary>();
@@ -153,7 +151,8 @@ export function ChangeRequests({
     <section className="hr-requests-container">
       <div className="hr-requests-count-summary">
         <span>
-          Showing {items.length} {section.label.toLowerCase()} change request{items.length !== 1 ? 's' : ''}
+          Showing {items.length} {section.label.toLowerCase()} change request
+          {items.length !== 1 ? 's' : ''}
         </span>
         {state && (
           <span className="hr-requests-meta-badge">
@@ -170,8 +169,9 @@ export function ChangeRequests({
             </div>
             <h3 className="hr-requests-empty-title">No {section.label} Requests Found</h3>
             <p className="hr-requests-empty-text">
-              There are currently no change requests pending in the {section.label.toLowerCase()} category.
-              When employees or department heads request record updates, they will appear here for audit and authorization.
+              There are currently no change requests pending in the {section.label.toLowerCase()}{' '}
+              category. When employees or department heads request record updates, they will appear
+              here for audit and authorization.
             </p>
           </div>
         ) : (
@@ -195,9 +195,7 @@ export function ChangeRequests({
               return (
                 <article className="hr-request-card" key={r.id}>
                   <div className="hr-request-card-left">
-                    <div className="hr-request-avatar">
-                      {initials}
-                    </div>
+                    <div className="hr-request-avatar">{initials}</div>
                     <div className="hr-request-info">
                       <div className="hr-request-emp-name">
                         <span>{empName}</span>
@@ -344,10 +342,10 @@ function ChangeRequestDetail({
                 query.data.request.state === 1
                   ? 'hr-status-pill--approved'
                   : query.data.request.state === 3
-                  ? 'hr-status-pill--rejected'
-                  : query.data.request.state === 2
-                  ? 'hr-status-pill--returned'
-                  : 'hr-status-pill--pending'
+                    ? 'hr-status-pill--rejected'
+                    : query.data.request.state === 2
+                      ? 'hr-status-pill--returned'
+                      : 'hr-status-pill--pending'
               }`}
             >
               {approvalLabels[query.data.request.state]}
@@ -396,7 +394,13 @@ function ChangeRequestDetail({
                       borderRadius: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <strong style={{ fontSize: '13px', color: '#0f172a' }}>
                         {approvalLabels[d.decision]}
                       </strong>
