@@ -7,7 +7,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-dev.ps1",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
@@ -19,7 +19,9 @@
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.23",
     "@tanstack/react-query": "5.104.1",
+    "@types/leaflet": "^1.9.22",
     "clsx": "2.1.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "1.52.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

@@ -10,5 +10,8 @@ export function PermissionGate({
   fallback?: ReactNode;
 }>) {
   const { status, user } = useAuth();
-  return status === 'authenticated' && user?.permissions.includes(permission) ? children : fallback;
+  // Presentation only: the API still checks this grant's record/field scope.
+  return status === 'authenticated' && user?.grants.some((grant) => grant.permission === permission)
+    ? children
+    : fallback;
 }

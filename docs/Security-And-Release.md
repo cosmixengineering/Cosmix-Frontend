@@ -2,15 +2,15 @@
 
 ## Current protections and limits
 
-- No business routes or demo UI are registered. Reusable session and permission helpers are scaffolding, not a completed identity system. Protect approved routes when implemented, and enforce authorization independently on every backend endpoint.
+- Global login/recovery and a protected current-account route are registered. Business routes and demo UI are not. The frontend uses the existing backend identity system; enforce authorization independently on every API.
 - No identity is fabricated, no live records are seeded and no token is persisted in browser storage.
-- Bearer requests are limited to the configured API base. Redirects are rejected; raw server exception text is not rendered.
+- Cookie requests are limited to the configured HTTPS API base and unsafe methods require CSRF. Redirects are rejected; raw server exception text is not rendered. No credentials/tokens are persisted; the only local-storage value is a non-sensitive refresh-stop flag.
 - Production assets do not include source maps by default. This is not a substitute for protecting secrets, which must never enter a browser bundle.
 - No HTML injection helper, arbitrary third-party script, analytics agent or external image is introduced.
 
 ## Before a release
 
-1. Implement and review real identity, MFA, refresh/revocation, logout and disabled-user behavior.
+1. Complete live SMS/account acceptance of the implemented web login, refresh/revocation, logout, recovery and disabled-user behavior. Current local provider/account setup is pending.
 2. Verify server permissions, record/field isolation, protected downloads and each implemented workflow.
 3. Configure HTTPS, correct API routing, a restrictive CSP, HSTS where appropriate, anti-framing/frame-ancestors, X-Content-Type-Options and Referrer-Policy at the serving infrastructure. Review connect-src against real identity and API origins.
 4. Serve static assets with appropriate caching and SPA fallback to index.html for client routes. Do not route unknown API requests to the SPA fallback.

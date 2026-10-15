@@ -1,2 +1,1 @@
-// Export approved module features here when implementation begins.
-export {};
+export { HrReportsPage } from './pages/HrReportsPage';

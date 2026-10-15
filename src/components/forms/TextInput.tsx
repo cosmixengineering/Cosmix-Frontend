@@ -9,7 +9,10 @@ export function TextInput({
   const inputId = id ?? generated;
   return (
     <div className="field">
-      <label htmlFor={inputId}>{label}</label>
+      <label htmlFor={inputId}>
+        {label}
+        {props.required && <span className="hr-required-mark" aria-hidden="true"> *</span>}
+      </label>
       <input
         {...props}
         id={inputId}

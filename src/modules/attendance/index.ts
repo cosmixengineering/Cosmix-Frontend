@@ -1,2 +1,13 @@
-// Export approved module features here when implementation begins.
-export {};
+export { ShiftsPage } from './pages/ShiftsPage';
+export { SiteRostersPage } from './pages/SiteRostersPage';
+export { SiteGeofencesPage } from './pages/SiteGeofencesPage';
+export { OfficeRostersPage } from './pages/OfficeRostersPage';
+export { OfficeBoundariesPage } from './pages/OfficeBoundariesPage';
+export { AttendanceProcessingPage } from './pages/AttendanceProcessingPage';
+export { EmployeeAttendanceDetailPage } from './pages/EmployeeAttendanceDetailPage';
+export { LeaveManagementPage } from './pages/LeaveManagementPage';
+export { LeaveEncashmentPage } from './pages/LeaveEncashmentPage';
+export { hasAttendancePermission } from './utils/access';
+export { attendanceOperationalRoutes, connectedAttendanceWorkspaces } from './operations/routes';
+export { attendanceOperationalNavigation } from './operations/navigation';
+

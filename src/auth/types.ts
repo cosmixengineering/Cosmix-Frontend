@@ -1,13 +1,7 @@
+import type { CurrentAccount, PermissionGrant } from './contracts';
+
 export interface SessionUser {
-  id: string;
-  displayName: string;
-  permissions: readonly string[];
+  account: CurrentAccount | null;
+  grants: readonly PermissionGrant[];
 }
-export interface AuthAdapter {
-  configured: boolean;
-  restoreSession: () => Promise<SessionUser | null>;
-  getAccessToken: () => Promise<string | null>;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-export type SessionStatus = 'loading' | 'unconfigured' | 'anonymous' | 'authenticated';
+export type SessionStatus = 'loading' | 'anonymous' | 'authenticated' | 'unavailable';
