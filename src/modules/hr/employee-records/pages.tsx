@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { EmployeeRecordsWorkspace } from './EmployeeRecordsWorkspace';
 import { familyOf } from './access';
@@ -6,9 +6,11 @@ import type { RecordKind } from './contracts';
 
 function EmployeeRecordPage({ kind }: { kind: RecordKind }) {
   const { employeeId = '' } = useParams();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
   return (
     <>
-      <Link className="hr-back" to="/hr/employees">
+      <Link className="hr-back" to={`${basePath}/employees`}>
         <ArrowLeft size={16} />
         Employees
       </Link>

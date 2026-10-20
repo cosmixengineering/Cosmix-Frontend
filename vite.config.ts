@@ -28,7 +28,7 @@ export default defineConfig(({ mode, command }) => {
         '/api': {
           target: env.API_PROXY_TARGET || 'https://localhost:7240',
           changeOrigin: true,
-          secure: true,
+          secure: false,
         },
       },
     },

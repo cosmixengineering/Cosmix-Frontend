@@ -21,9 +21,6 @@ import {
   Menu,
   X,
   LogOut,
-  Building2,
-  Sun,
-  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Clock,
@@ -31,14 +28,15 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '@/auth/use-auth';
+import { isSystemAdmin } from '@/auth/contracts';
 import { Button } from '@/components/ui/Button';
+import logo from '@/assets/images/cosmix-logo.png';
 import '@/styles/admin-dashboard.css';
 
 export function AdminLayout() {
   const { user, signOut, status } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('cosmix_sidebar_collapsed') === 'true';
   });
@@ -56,14 +54,7 @@ export function AdminLayout() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const isAdmin = Boolean(
-    user?.grants.some(
-      (g) =>
-        g.permission === 'hr.organization.manage' ||
-        g.permission === 'hr.employees.submissions.review' ||
-        g.permission.startsWith('admin.'),
-    ),
-  );
+  const isAdmin = isSystemAdmin(user);
 
   // If user is authenticated but not an admin, redirect to HR dashboard
   if (status === 'authenticated' && user && !isAdmin) {
@@ -83,7 +74,7 @@ export function AdminLayout() {
   const navItems = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/admin/panel', label: 'My Panel', icon: User },
-    { to: '/hr/dashboard', label: 'HR', icon: Users },
+    { to: '/admin/employees', label: 'Employees', icon: Users },
     { to: '/hr/attendance', label: 'Attendance', icon: Clock },
     { to: '/hr/leaves', label: 'Leave Management', icon: Calendar },
     { to: '/hr/attendance/shifts', label: 'Shifts & Rosters', icon: CalendarDays },
@@ -93,7 +84,7 @@ export function AdminLayout() {
     { to: '/admin/sales', label: 'Sales & CRM', icon: TrendingUp },
     { to: '/admin/operations', label: 'Operations', icon: Settings2 },
     { to: '/admin/projects', label: 'Projects', icon: ListTodo },
-    { to: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck, badge: '17' },
+    { to: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { to: '/admin/reports', label: 'Reports', icon: FileText },
     { to: '/admin/users', label: 'Users & Roles', icon: UserCheck },
     { to: '/admin/departments', label: 'Departments', icon: Network },
@@ -101,10 +92,10 @@ export function AdminLayout() {
   ];
 
   return (
-    <div className={`admin-shell ${collapsed ? 'is-collapsed' : ''} ${isDark ? 'dark-mode' : ''}`}>
+    <div className={`admin-shell ${collapsed ? 'is-collapsed' : ''}`}>
       {open && (
         <button
-          className="hr-sidebar-scrim"
+          className="admin-sidebar-scrim"
           aria-label="Close navigation"
           onClick={() => setOpen(false)}
         />
@@ -112,32 +103,20 @@ export function AdminLayout() {
 
       {/* Admin Sidebar */}
       <aside
-        className={`admin-sidebar ${isDark ? 'dark-mode' : ''} ${open ? 'is-open' : ''}`}
+        className={`admin-sidebar ${open ? 'is-open' : ''}`}
         aria-label="Admin Navigation"
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderBottom: '1px solid #f1f5f9',
-            padding: '2px 4px 10px',
-            gap: '6px',
-          }}
-        >
+        <div className="admin-sidebar-header">
           <Link
             to="/admin/dashboard"
             className="admin-brand"
-            style={{ borderBottom: 'none', padding: 0 }}
             onClick={() => setOpen(false)}
           >
-            <div className="admin-brand-icon">
-              <Building2 size={18} />
-            </div>
+            <img src={logo} alt="Cosmix Engineering" className="admin-brand-logo" />
             {!collapsed && (
               <div className="admin-brand-text">
-                <h2>NextERP</h2>
-                <p>One Platform. A Smarter Business.</p>
+                <h2>Cosmix ERP</h2>
+                <p>System Administrator</p>
               </div>
             )}
           </Link>
@@ -153,7 +132,7 @@ export function AdminLayout() {
         </div>
 
         <button
-          className="icon-button hr-close-nav"
+          className="icon-button admin-close-nav"
           onClick={() => setOpen(false)}
           aria-label="Close navigation"
         >
@@ -172,7 +151,6 @@ export function AdminLayout() {
             >
               <item.icon size={15} />
               {!collapsed && <span>{item.label}</span>}
-              {item.badge && <span className="admin-badge-count">{item.badge}</span>}
             </NavLink>
           ))}
 
@@ -192,12 +170,10 @@ export function AdminLayout() {
         {/* Bottom Company Card */}
         {!collapsed && (
           <div className="admin-sidebar-bottom-card">
-            <div className="admin-bottom-icon">
-              <Building2 size={15} />
-            </div>
+            <img src={logo} alt="Cosmix" className="admin-bottom-logo" />
             <div className="admin-bottom-text">
-              <strong>Global ERP Solutions</strong>
-              <span>Grow Together</span>
+              <strong>Cosmix Engineering</strong>
+              <span>Administrative Console</span>
             </div>
           </div>
         )}
@@ -206,17 +182,9 @@ export function AdminLayout() {
       {/* Main Workspace */}
       <div className="admin-workspace">
         <header className="admin-topbar">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              flex: 1,
-              maxWidth: '580px',
-            }}
-          >
+          <div className="admin-topbar-left">
             <button
-              className="icon-button hr-open-nav"
+              className="icon-button admin-open-nav"
               ref={menuButton}
               aria-label="Open navigation"
               onClick={() => setOpen(true)}
@@ -249,17 +217,6 @@ export function AdminLayout() {
           </div>
 
           <div className="admin-topbar-actions">
-            {/* Theme Toggle (Light / Dark) */}
-            <button
-              type="button"
-              className="admin-theme-toggle"
-              onClick={() => setIsDark(!isDark)}
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {isDark ? <Sun size={15} style={{ color: '#f59e0b' }} /> : <Moon size={15} />}
-              <span>{isDark ? 'Light' : 'Dark'}</span>
-            </button>
-
             {/* Notification Bell */}
             <Link
               to="/admin/approvals"
@@ -273,9 +230,9 @@ export function AdminLayout() {
             {/* User Chip */}
             <Link to="/admin/account" className="admin-user-chip">
               <div className="admin-user-avatar">{displayName.charAt(0).toUpperCase() || 'A'}</div>
-              <div className="hr-user-info">
-                <span className="hr-user-name">{displayName}</span>
-                <span className="hr-user-role">{roleName}</span>
+              <div className="admin-user-info">
+                <span className="admin-user-name">{displayName}</span>
+                <span className="admin-user-role">{roleName}</span>
               </div>
             </Link>
 

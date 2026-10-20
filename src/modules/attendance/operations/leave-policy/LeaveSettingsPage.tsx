@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Copy, Plus } from 'lucide-react';
 import { TextInput } from '@/components/forms/TextInput';
 import {
   Command,
@@ -10,16 +10,11 @@ import {
 } from '../../components/SchedulingUi';
 import { useAttendanceAccess } from '../../hooks/use-attendance-access';
 import { useAttendanceQuery } from '../../hooks/use-attendance-query';
-import {
-  leavePolicies,
-  leavePolicy,
-  leavePolicyInput,
-  leaveType,
-  leaveTypeInput,
-  leaveTypes,
-} from './contracts';
+import { leaveType, leaveTypeInput, leaveTypes } from './contracts';
 import { canAll, kindNames } from './inputs';
 import { Choice, EvidenceRecord, Reload } from './Ui';
+import { readableLeavePolicies, type PublishedLeavePolicy } from '../leave-benefits/api';
+import { LeavePolicyPublisher } from './LeavePolicyPublisher';
 
 export function LeaveSettingsPage() {
   return (
@@ -32,11 +27,30 @@ function LeaveSettings() {
   const access = useAttendanceAccess();
   const allowed = access.ready && canAll(access.user, 'attendance.leaves.configure');
   const types = useAttendanceQuery('/hr/leave-settings/types', leaveTypes, allowed);
-  const policies = useAttendanceQuery('/hr/leave-settings/policies', leavePolicies, allowed);
+  const policies = useAttendanceQuery(
+    '/hr/leave-settings/policies',
+    readableLeavePolicies,
+    allowed,
+  );
   const [form, setForm] = useState('');
   const [epoch, setEpoch] = useState(0);
+  const [source, setSource] = useState<PublishedLeavePolicy | undefined>();
+  useEffect(() => {
+    if (policies.isError) {
+      setSource(undefined);
+      setForm((current) => (current === 'policy' ? '' : current));
+    }
+  }, [policies.isError]);
+  const publicationBlock = policies.isError
+    ? 'Publishing is disabled because the published settings could not be read. Reload the history before publishing.'
+    : policies.isPending || !policies.data
+      ? 'Publishing is disabled until the published settings have loaded.'
+      : policies.isFetching
+        ? 'Publishing is disabled while the published settings are being refreshed.'
+        : '';
   function reload() {
     setForm('');
+    setSource(undefined);
     setEpoch((e) => e + 1);
     void types.refetch();
     void policies.refetch();
@@ -52,17 +66,38 @@ function LeaveSettings() {
           disabled={Boolean(form) || types.isFetching || policies.isFetching}
         />
       </div>
+      {publicationBlock && (
+        <p id="leave-policy-publication-status" role="status">
+          {publicationBlock}
+        </p>
+      )}
       {form === 'type' ? (
         <LeaveTypeForm key={epoch} onSaved={reload} onCancel={reload} />
-      ) : form === 'policy' ? (
-        <LeavePolicyForm key={epoch} onSaved={reload} onCancel={reload} />
+      ) : form === 'policy' && !policies.isError ? (
+        <LeavePolicyPublisher
+          key={epoch}
+          source={source}
+          publicationBlock={publicationBlock}
+          onSaved={reload}
+          onCancel={reload}
+        />
       ) : (
         <div className="attendance-commands">
           <Command icon={Plus} onClick={() => setForm('type')}>
             Create leave type
           </Command>
-          <Command icon={Plus} onClick={() => setForm('policy')}>
-            Publish leave settings
+          <Command
+            icon={Plus}
+            disabled={Boolean(publicationBlock)}
+            aria-describedby={publicationBlock ? 'leave-policy-publication-status' : undefined}
+            onClick={() => {
+              if (!publicationBlock) {
+                setSource(undefined);
+                setForm('policy');
+              }
+            }}
+          >
+            Publish v4 leave settings
           </Command>
         </div>
       )}
@@ -87,9 +122,23 @@ function LeaveSettings() {
           policies.data?.map((row) => (
             <details key={row.versionId}>
               <summary>
-                {row.code}: {row.effectiveFrom} to {row.effectiveTo ?? 'open'}
+                {row.code} (v{row.settings.settingsVersion ?? 1}): {row.effectiveFrom} to{' '}
+                {row.effectiveTo ?? 'open'}
               </summary>
               <EvidenceRecord value={row} />
+              <Command
+                icon={Copy}
+                variant="secondary"
+                disabled={Boolean(form) || Boolean(publicationBlock)}
+                onClick={() => {
+                  if (!form && !publicationBlock) {
+                    setSource(structuredClone(row));
+                    setForm('policy');
+                  }
+                }}
+              >
+                Copy to new publication
+              </Command>
             </details>
           ))}
       </section>
@@ -173,189 +222,6 @@ function LeaveTypeForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
         required
         value={inputReason}
         onChange={(e) => setReason(e.target.value)}
-      />
-    </MutationForm>
-  );
-}
-function LeavePolicyForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [paid, setPaid] = useState<number[]>([]);
-  const [paidReviewed, setPaidReviewed] = useState(false);
-  const update = (key: string, value: string) =>
-    setFields((current) => ({ ...current, [key]: value }));
-  return (
-    <MutationForm
-      title="Publish explicit leave settings"
-      onSaved={onSaved}
-      onCancel={onCancel}
-      submitLabel="Publish directly"
-      build={() => {
-        if (!paidReviewed)
-          throw new Error(
-            'Confirm the paid-kind selection, including an explicit empty selection.',
-          );
-        const ids = (fields.eligibleStaffCategoryIds ?? '').split(/[\s,]+/).filter(Boolean);
-        return {
-          path: '/hr/leave-settings/policies',
-          method: 'POST',
-          schema: leavePolicy,
-          body: leavePolicyInput.parse({
-            code: fields.code,
-            name: fields.name,
-            effectiveFrom: fields.effectiveFrom,
-            effectiveTo: fields.effectiveTo,
-            reason: fields.reason,
-            settings: {
-              settingsVersion: 2,
-              yearStartMonth: Number(fields.yearStartMonth),
-              yearStartDay: Number(fields.yearStartDay),
-              annualDays: Number(fields.annualDays),
-              sickDays: Number(fields.sickDays),
-              casualDays: Number(fields.casualDays),
-              minimumServiceMonths: Number(fields.minimumServiceMonths),
-              standardDayMinutes: Number(fields.standardDayMinutes),
-              eligibleStaffCategoryIds: ids,
-              holidayCalendarId: fields.holidayCalendarId,
-              holidayTreatment: Number(fields.holidayTreatment),
-              paidKinds: paid,
-            },
-          }),
-        };
-      }}
-    >
-      <div className="attendance-grid">
-        {['code', 'name'].map((key) => (
-          <TextInput
-            key={key}
-            label={key === 'code' ? 'Unique policy code' : 'Policy name'}
-            required
-            maxLength={key === 'code' ? 40 : 200}
-            value={fields[key] ?? ''}
-            onChange={(e) => update(key, e.target.value)}
-          />
-        ))}
-        <TextInput
-          label="Effective from"
-          type="date"
-          required
-          value={fields.effectiveFrom ?? ''}
-          onChange={(e) => update('effectiveFrom', e.target.value)}
-        />
-        <TextInput
-          label="Exclusive end"
-          type="date"
-          required
-          value={fields.effectiveTo ?? ''}
-          onChange={(e) => update('effectiveTo', e.target.value)}
-        />
-        {[
-          ['annualDays', 'Annual days'],
-          ['sickDays', 'Sick days'],
-          ['casualDays', 'Casual days'],
-          ['minimumServiceMonths', 'Minimum service months'],
-          ['standardDayMinutes', 'Standard day minutes'],
-        ].map(([key, label]) => (
-          <TextInput
-            key={key}
-            label={label!}
-            type="number"
-            min={key === 'standardDayMinutes' ? 1 : 0}
-            max={key === 'standardDayMinutes' ? 1440 : undefined}
-            step={1}
-            required
-            value={fields[key!] ?? ''}
-            onChange={(e) => update(key!, e.target.value)}
-          />
-        ))}
-        <Choice
-          label="Leave year starting month"
-          value={fields.yearStartMonth ?? ''}
-          options={[
-            'January',
-            'February',
-            'March',
-            'April',
-            'May',
-            'June',
-            'July',
-            'August',
-            'September',
-            'October',
-            'November',
-            'December',
-          ].map((label, index) => ({ value: String(index + 1), label }))}
-          onChange={(value) => update('yearStartMonth', value)}
-        />
-        <TextInput
-          label="Leave year starting day"
-          type="number"
-          min={1}
-          max={31}
-          step={1}
-          required
-          value={fields.yearStartDay ?? ''}
-          onChange={(event) => update('yearStartDay', event.target.value)}
-        />
-      </div>
-      <TextInput
-        label="Eligible staff category IDs (comma separated)"
-        required
-        value={fields.eligibleStaffCategoryIds ?? ''}
-        onChange={(e) => update('eligibleStaffCategoryIds', e.target.value)}
-      />
-      <TextInput
-        label="Exact holiday calendar revision ID"
-        required
-        value={fields.holidayCalendarId ?? ''}
-        onChange={(e) => update('holidayCalendarId', e.target.value)}
-      />
-      <Choice
-        label="Holiday treatment"
-        value={fields.holidayTreatment ?? ''}
-        options={[
-          { value: '1', label: 'Exclude' },
-          { value: '2', label: 'Count' },
-        ]}
-        onChange={(v) => update('holidayTreatment', v)}
-      />
-      <h3>Paid kinds</h3>
-      <div className="attendance-days">
-        {kindNames.map((label, i) => (
-          <label className="attendance-check" key={i}>
-            <input
-              type="checkbox"
-              checked={paid.includes(i)}
-              onChange={(e) => {
-                setPaid((rows) => (e.target.checked ? [...rows, i] : rows.filter((n) => n !== i)));
-                setPaidReviewed(false);
-              }}
-            />
-            {label}
-          </label>
-        ))}
-      </div>
-      <label className="attendance-check">
-        <input
-          type="checkbox"
-          checked={paidReviewed}
-          onChange={(e) => setPaidReviewed(e.target.checked)}
-        />
-        Confirm paid-kind selection
-      </label>
-      <TextInput
-        label="Publication reason"
-        maxLength={1000}
-        required
-        value={fields.reason ?? ''}
-        onChange={(e) => update('reason', e.target.value)}
-      />
-      <EvidenceRecord
-        value={{
-          leaveYearStartingMonth: fields.yearStartMonth || null,
-          leaveYearStartingDay: fields.yearStartDay || null,
-          paidKinds: paid.map((i) => kindNames[i]),
-          holidayCalendarRevisionId: fields.holidayCalendarId ?? null,
-        }}
       />
     </MutationForm>
   );

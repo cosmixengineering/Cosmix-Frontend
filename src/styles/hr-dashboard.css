@@ -1533,6 +1533,26 @@
   color: #0f172a;
 }
 
+.dash-v3-btn-export:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.dash-v3-notice {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.dash-v3-notice .hr-text-button {
+  margin-left: 8px;
+}
+
 /* 4 Compact Metric Cards */
 .dash-v3-kpis-grid {
   display: grid;
@@ -1562,6 +1582,7 @@
   justify-content: space-between;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.15s ease;
+  gap: 12px;
 }
 
 .dash-v3-kpi-card:hover {
@@ -1572,6 +1593,7 @@
 .dash-v3-kpi-left {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .dash-v3-kpi-title {
@@ -1612,6 +1634,107 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  line-height: 1.45;
+}
+
+.dash-v3-salary-value {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.dash-v3-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 14px;
+}
+
+.dash-v3-source-card {
+  min-width: 0;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.dash-v3-source-card h2,
+.dash-v3-source-card h3 {
+  margin: 0 0 5px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dash-v3-source-card h3 {
+  margin-top: 12px;
+}
+
+.dash-v3-source-meta,
+.dash-v3-source-note {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.dash-v3-source-meta {
+  color: #475569;
+}
+
+.dash-v3-source-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 12px 0;
+}
+
+.dash-v3-source-counts dt {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.dash-v3-source-counts dd {
+  margin: 3px 0 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dash-v3-source-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.dash-v3-source-tags span {
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+}
+
+.dash-v3-salary-source,
+.dash-v3-handoff-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 10px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.dash-v3-salary-source strong,
+.dash-v3-handoff-list strong {
+  color: #334155;
+}
+
+.dash-v3-handoff-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .dash-v3-kpi-sub.color-green {

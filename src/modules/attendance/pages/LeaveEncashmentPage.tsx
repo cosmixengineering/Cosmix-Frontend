@@ -1,388 +1,244 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { z } from 'zod';
-import { TextInput } from '@/components/forms/TextInput';
+import { ClipboardCheck, RefreshCw } from 'lucide-react';
 import { SelectInput } from '@/components/forms/SelectInput';
-import { Button } from '@/components/ui/Button';
+import {
+  Command,
+  Denied,
+  MutationForm,
+  PrivateWorkspace,
+  QueryState,
+  SavedNotice,
+} from '../components/SchedulingUi';
 import { useAttendanceAccess } from '../hooks/use-attendance-access';
-import { useAttendanceAction } from '../hooks/use-attendance-action';
 import { useAttendanceQuery } from '../hooks/use-attendance-query';
+import { reason as decisionReason, rowVersion, timestamp } from '../schemas/common';
 
-const permissions = {
-  submit: 'attendance.leave.encashment.submit',
-  mine: 'attendance.leave.encashment.mine',
-  queue: 'attendance.leave.encashment.queue',
-  decide: 'attendance.leave.encashment.decide',
-};
-
+const reviewPermission = 'attendance.leaves.review';
 const decisionOptions = [
   { value: '1', label: 'Approve' },
   { value: '2', label: 'Return' },
   { value: '3', label: 'Reject' },
 ];
-
-const stateLabels: Record<number, string> = {
-  0: 'Pending',
-  1: 'Approved',
-  2: 'Returned',
-  3: 'Rejected',
-  4: 'Cancelled',
-};
-
+const stateLabels = ['Pending', 'Approved', 'Returned', 'Rejected', 'Cancelled'];
+const approvalState = z.number().int().min(0).max(4);
 const leaveDecision = z.object({
   id: z.uuid(),
   approvalRequestId: z.uuid(),
-  decision: z.number().int(),
+  decision: approvalState,
   actorRole: z.string(),
   reason: z.string().nullable(),
-  atUtc: z.string(),
+  atUtc: timestamp,
 });
-
-const encashment = z.object({
-  id: z.uuid(),
-  employeeId: z.uuid(),
-  leaveYearStart: z.iso.date(),
-  leaveYearEnd: z.iso.date(),
-  requestedMinutes: z.number().int(),
-  assessedKpiPercent: z.number(),
-  proposedAmount: z.number(),
-  currency: z.string(),
-  policyVersionId: z.uuid(),
-  approvalRequestId: z.uuid(),
-  state: z.number().int().min(0).max(4),
-  approvalVersion: z.string(),
-  createdAt: z.string(),
-  decisions: z.array(leaveDecision),
-});
+const encashment = z
+  .object({
+    id: z.uuid(),
+    employeeId: z.uuid(),
+    leaveYearStart: z.iso.date(),
+    leaveYearEnd: z.iso.date(),
+    requestedMinutes: z.number().int().positive(),
+    assessedKpiPercent: z.number(),
+    proposedAmount: z.number().nonnegative(),
+    currency: z.string().min(1),
+    policyVersionId: z.uuid(),
+    approvalRequestId: z.uuid(),
+    state: approvalState,
+    approvalVersion: z.string(),
+    createdAt: timestamp,
+    decisions: z.array(leaveDecision),
+  })
+  .refine((item) =>
+    item.decisions.every((entry) => entry.approvalRequestId === item.approvalRequestId),
+  );
 const encashmentList = z.array(encashment);
+const decisionBody = z.object({
+  decision: z.number().int().min(1).max(3),
+  expectedApprovalVersion: rowVersion,
+  reason: decisionReason(),
+});
 type Encashment = z.infer<typeof encashment>;
 
-function formatMinutes(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+function canDecide(item: Encashment, employeeId: string | null | undefined) {
+  return (
+    item.state === 0 &&
+    item.employeeId !== employeeId &&
+    item.approvalRequestId !== '00000000-0000-0000-0000-000000000000' &&
+    rowVersion.safeParse(item.approvalVersion).success
+  );
 }
 
 export function LeaveEncashmentPage() {
-  const access = useAttendanceAccess();
-  const tabs = [
-    ...(access.can(permissions.mine) ? [{ id: 'mine', label: 'My encashments' }] : []),
-    ...(access.can(permissions.queue) ? [{ id: 'queue', label: 'Review queue' }] : []),
-  ];
-  const [tab, setTab] = useState(tabs[0]?.id ?? '');
-  if (!tabs.length)
-    return (
-      <section aria-label="Leave encashment">
-        <div className="hr-page-heading">
-          <p className="hr-kicker">HUMAN RESOURCES &bull; Leave</p>
-          <h1>Leave Encashment</h1>
-        </div>
-        <p className="hr-notice" role="alert">
-          You do not hold a permission for leave encashment.
-        </p>
-      </section>
-    );
-  const active = tabs.some((item) => item.id === tab) ? tab : (tabs[0]?.id ?? '');
   return (
-    <section aria-label="Leave encashment">
-      <div className="hr-page-heading">
-        <p className="hr-kicker">HUMAN RESOURCES &bull; Leave</p>
-        <h1>Leave Encashment</h1>
+    <PrivateWorkspace resource="leave-encashment-review">
+      <EncashmentQueue />
+    </PrivateWorkspace>
+  );
+}
+
+function EncashmentQueue() {
+  const access = useAttendanceAccess();
+  const allowed = access.ready && Boolean(access.user?.account) && access.can(reviewPermission);
+  const list = useAttendanceQuery('/leaves/admin/encashment/queue', encashmentList, allowed);
+  const [selected, setSelected] = useState<Encashment | null>(null);
+  const [saved, setSaved] = useState('');
+  if (!allowed)
+    return (
+      <Denied>
+        Encashment review requires an All-scoped leave review grant and fixed Admin authority.
+      </Denied>
+    );
+
+  function reload() {
+    setSelected(null);
+    void list.refetch();
+  }
+
+  return (
+    <section aria-label="Leave encashment review">
+      <div className="attendance-heading">
+        <h1>Leave encashment review</h1>
+        <Command
+          icon={RefreshCw}
+          variant="secondary"
+          disabled={Boolean(selected) || list.isFetching}
+          onClick={reload}
+        >
+          {list.isError ? 'Retry queue' : 'Refresh queue'}
+        </Command>
       </div>
-      <nav className="hr-tabs" aria-label="Leave encashment views">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={item.id === active ? 'active' : ''}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-      {active === 'mine' && <MyEncashments canSubmit={access.can(permissions.submit)} />}
-      {active === 'queue' && <EncashmentQueue canDecide={access.can(permissions.decide)} />}
+      <SavedNotice message={saved} />
+      <QueryState
+        query={list}
+        empty={!selected && list.data?.length === 0}
+        emptyText="No encashment applications in the review queue."
+      />
+      {selected ? (
+        <>
+          <EncashmentCard item={selected} />
+          <EncashmentDecisionForm
+            key={selected.id + ':' + selected.approvalVersion}
+            item={selected}
+            onCancel={reload}
+            onSaved={(result) => {
+              setSaved(
+                `Encashment ${result.id}: ${stateLabels[result.state]}. Decision recorded; no payment released.`,
+              );
+              reload();
+            }}
+          />
+        </>
+      ) : (
+        !list.isError &&
+        !list.isPending &&
+        !list.isFetching &&
+        list.data?.map((item) => (
+          <article className="hr-repeat" key={item.id}>
+            <EncashmentCard item={item} />
+            {canDecide(item, access.user?.account?.employeeId) ? (
+              <div className="hr-actions">
+                <Command
+                  icon={ClipboardCheck}
+                  variant="secondary"
+                  onClick={() => {
+                    setSaved('');
+                    setSelected(item);
+                  }}
+                >
+                  Review decision
+                </Command>
+              </div>
+            ) : item.state === 0 ? (
+              <p role="status">
+                {item.employeeId === access.user?.account?.employeeId
+                  ? 'Your own encashment requires an independent Admin reviewer.'
+                  : 'Approval evidence is unavailable. Refresh the queue before reviewing.'}
+              </p>
+            ) : null}
+          </article>
+        ))
+      )}
     </section>
   );
 }
 
-function MyEncashments({ canSubmit }: { canSubmit: boolean }) {
-  const action = useAttendanceAction();
-  const list = useAttendanceQuery('/leaves/mine/encashment', encashmentList, true);
-  const [form, setForm] = useState({
-    requestedMinutes: '480',
-    leaveYearStart: '',
-    leaveYearEnd: '',
-    reason: '',
-  });
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const errors: Record<string, string> = {};
-    const minutes = Number(form.requestedMinutes);
-    if (!Number.isInteger(minutes) || minutes < 60 || minutes > 43200)
-      errors.requestedMinutes = 'Enter a whole number of minutes between 60 and 43200 (8h = 480).';
-    if (!form.leaveYearStart) errors.leaveYearStart = 'A leave year start is required.';
-    if (!form.leaveYearEnd) errors.leaveYearEnd = 'A leave year end is required.';
-    if (form.leaveYearStart && form.leaveYearEnd && form.leaveYearEnd < form.leaveYearStart)
-      errors.leaveYearEnd = 'The leave year end cannot be before the start.';
-    if (!form.reason.trim()) errors.reason = 'A reason is required.';
-    else if (form.reason.length > 1000)
-      errors.reason = 'The reason must be at most 1000 characters.';
-    setFieldErrors(errors);
-    if (Object.keys(errors).length) return;
-    await action.run(
-      '/leaves/mine/encashment',
-      {
-        requestedMinutes: minutes,
-        leaveYearStart: form.leaveYearStart,
-        leaveYearEnd: form.leaveYearEnd,
-        reason: form.reason.trim(),
-      },
-      'POST',
-      encashment,
-    );
-  }
-  return (
-    <>
-      {canSubmit && (
-        <div className="hr-form-section">
-          <h2>Submit an encashment</h2>
-          <p className="muted">
-            The assessed KPI percent and proposed amount are calculated on the server from your
-            latest KPI record and monthly base salary for the chosen leave year.
-          </p>
-          <form onSubmit={(event) => void submit(event)}>
-            <div className="hr-form-grid">
-              <TextInput
-                label="Requested minutes"
-                required
-                type="number"
-                min={60}
-                max={43200}
-                value={form.requestedMinutes}
-                error={fieldErrors.requestedMinutes}
-                onChange={(event) => setForm({ ...form, requestedMinutes: event.target.value })}
-              />
-              <TextInput
-                label="Leave year start"
-                required
-                type="date"
-                value={form.leaveYearStart}
-                error={fieldErrors.leaveYearStart}
-                onChange={(event) => setForm({ ...form, leaveYearStart: event.target.value })}
-              />
-              <TextInput
-                label="Leave year end"
-                required
-                type="date"
-                value={form.leaveYearEnd}
-                error={fieldErrors.leaveYearEnd}
-                onChange={(event) => setForm({ ...form, leaveYearEnd: event.target.value })}
-              />
-            </div>
-            <label className="hr-field">
-              <span>Reason</span>
-              <textarea
-                rows={3}
-                required
-                maxLength={1000}
-                value={form.reason}
-                aria-invalid={Boolean(fieldErrors.reason)}
-                onChange={(event) => setForm({ ...form, reason: event.target.value })}
-              />
-              {fieldErrors.reason && <p className="field-error">{fieldErrors.reason}</p>}
-            </label>
-            {action.error && (
-              <p className="hr-message hr-message--error" role="alert">
-                {action.error}
-              </p>
-            )}
-            {action.success && (
-              <p className="hr-message" role="status">
-                {action.success}
-              </p>
-            )}
-            {action.uncertain && (
-              <p className="hr-notice" role="alert">
-                The last result is unconfirmed. Reload to check before retrying.
-              </p>
-            )}
-            <div className="hr-actions">
-              <Button type="submit" disabled={action.pending}>
-                {action.pending ? 'Submitting...' : 'Submit encashment'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-      <div className="hr-form-section">
-        <h2>My applications</h2>
-        {list.isPending && (
-          <p className="hr-notice" role="status">
-            Loading encashments...
-          </p>
-        )}
-        {list.isError && (
-          <div className="hr-notice" role="alert">
-            <p>Could not load your encashment applications.</p>
-            <Button variant="secondary" onClick={() => void list.refetch()}>
-              Retry
-            </Button>
-          </div>
-        )}
-        {list.data?.length === 0 && (
-          <p className="hr-notice" role="status">
-            You have not submitted any encashment applications.
-          </p>
-        )}
-        {list.data?.map((item) => (
-          <EncashmentCard key={item.id} item={item} />
-        ))}
-      </div>
-    </>
-  );
-}
-
-function EncashmentQueue({ canDecide }: { canDecide: boolean }) {
-  const action = useAttendanceAction();
-  const list = useAttendanceQuery('/leaves/admin/encashment/queue', encashmentList, true);
-  const [deciding, setDeciding] = useState<string | null>(null);
-  const [decision, setDecision] = useState('1');
+function EncashmentDecisionForm({
+  item,
+  onSaved,
+  onCancel,
+}: {
+  item: Encashment;
+  onSaved: (result: Encashment) => void;
+  onCancel: () => void;
+}) {
+  const access = useAttendanceAccess();
+  const [decision, setDecision] = useState('');
   const [reason, setReason] = useState('');
-  const [approvedAmount, setApprovedAmount] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  async function decide(item: Encashment) {
-    const errors: Record<string, string> = {};
-    if (!reason.trim()) errors.reason = 'A reason is required.';
-    else if (reason.length > 1000) errors.reason = 'The reason must be at most 1000 characters.';
-    const amount = approvedAmount ? Number(approvedAmount) : null;
-    if (amount !== null && (!Number.isFinite(amount) || amount < 0))
-      errors.approvedAmount = 'Enter a non-negative amount or leave the field empty.';
-    setFieldErrors(errors);
-    if (Object.keys(errors).length) return;
-    const result = await action.run(
-      `/leaves/admin/encashment/${item.id}/decisions`,
-      {
-        decision: Number(decision),
-        expectedApprovalVersion: item.approvalVersion,
-        reason: reason.trim(),
-        approvedAmount: amount,
-      },
-      'POST',
-      encashment,
-    );
-    if (result) {
-      setDeciding(null);
-      setReason('');
-      setApprovedAmount('');
-    }
-  }
+  const allowed =
+    access.ready &&
+    Boolean(access.user?.account) &&
+    access.can(reviewPermission) &&
+    canDecide(item, access.user?.account?.employeeId);
   return (
-    <div className="hr-form-section">
-      <h2>Pending encashments</h2>
-      {list.isPending && (
-        <p className="hr-notice" role="status">
-          Loading queue...
-        </p>
-      )}
-      {list.isError && (
-        <div className="hr-notice" role="alert">
-          <p>Could not load the encashment queue.</p>
-          <Button variant="secondary" onClick={() => void list.refetch()}>
-            Retry
-          </Button>
-        </div>
-      )}
-      {list.data?.length === 0 && (
-        <p className="hr-notice" role="status">
-          No pending encashment applications.
-        </p>
-      )}
-      {list.data?.map((item) => (
-        <article className="hr-repeat" key={item.id}>
-          <EncashmentCard item={item} />
-          {canDecide && (
-            <div className="hr-actions">
-              {deciding === item.id ? (
-                <>
-                  <SelectInput
-                    label="Decision"
-                    value={decision}
-                    onChange={(event) => setDecision(event.target.value)}
-                    options={decisionOptions}
-                  />
-                  <TextInput
-                    label="Approved amount"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={approvedAmount}
-                    error={fieldErrors.approvedAmount}
-                    onChange={(event) => setApprovedAmount(event.target.value)}
-                  />
-                  <label className="hr-field">
-                    <span>Reason</span>
-                    <textarea
-                      rows={2}
-                      required
-                      maxLength={1000}
-                      value={reason}
-                      aria-invalid={Boolean(fieldErrors.reason)}
-                      onChange={(event) => setReason(event.target.value)}
-                    />
-                    {fieldErrors.reason && <p className="field-error">{fieldErrors.reason}</p>}
-                  </label>
-                  <Button
-                    variant="secondary"
-                    onClick={() => void decide(item)}
-                    disabled={action.pending}
-                  >
-                    {action.pending ? 'Recording...' : 'Record decision'}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setDeciding(null);
-                      setReason('');
-                      setFieldErrors({});
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button variant="secondary" onClick={() => setDeciding(item.id)}>
-                  Decide
-                </Button>
-              )}
-            </div>
-          )}
-        </article>
-      ))}
-      {action.error && (
-        <p className="hr-message hr-message--error" role="alert">
-          {action.error}
-        </p>
-      )}
-      {action.success && (
-        <p className="hr-message" role="status">
-          {action.success}
-        </p>
-      )}
-    </div>
+    <MutationForm
+      title="Encashment decision"
+      submitLabel="Record decision"
+      disabled={!allowed}
+      onCancel={onCancel}
+      onSaved={(result) => onSaved(encashment.parse(result))}
+      build={() => {
+        if (!allowed) throw new Error('Encashment review is unavailable.');
+        const body = decisionBody.parse({
+          decision: Number(decision),
+          expectedApprovalVersion: item.approvalVersion,
+          reason,
+        });
+        return {
+          path: `/leaves/admin/encashment/${item.id}/decisions`,
+          method: 'POST',
+          body,
+          schema: encashment.refine(
+            (result) =>
+              result.id === item.id &&
+              result.employeeId === item.employeeId &&
+              result.approvalRequestId === item.approvalRequestId &&
+              result.state === body.decision &&
+              result.proposedAmount === item.proposedAmount &&
+              result.decisions.some(
+                (entry) => entry.decision === body.decision && entry.reason === body.reason,
+              ),
+            'The saved decision could not be confirmed for this encashment.',
+          ),
+        };
+      }}
+    >
+      <SelectInput
+        label="Decision"
+        required
+        value={decision}
+        onChange={(event) => setDecision(event.target.value)}
+        options={[{ value: '', label: 'Select a decision' }, ...decisionOptions]}
+      />
+      <label className="hr-field">
+        <span>Reason</span>
+        <textarea
+          rows={3}
+          required
+          maxLength={1000}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+    </MutationForm>
   );
 }
 
 function EncashmentCard({ item }: { item: Encashment }) {
-  const latest = item.decisions.length ? item.decisions[item.decisions.length - 1] : undefined;
   return (
-    <article className="hr-repeat">
+    <div>
       <div className="hr-repeat-heading">
-        <h3>
-          {formatMinutes(item.requestedMinutes)} &middot; {item.currency}{' '}
-          {item.proposedAmount.toFixed(2)}
-        </h3>
+        <h2>
+          {item.requestedMinutes} minutes &middot; {item.currency} {item.proposedAmount.toFixed(2)}
+        </h2>
         <span
           className={`hr-status ${
             item.state === 1
@@ -392,10 +248,18 @@ function EncashmentCard({ item }: { item: Encashment }) {
                 : 'hr-status--error'
           }`}
         >
-          {stateLabels[item.state] ?? String(item.state)}
+          {stateLabels[item.state]}
         </span>
       </div>
       <dl className="hr-detail-grid">
+        <div>
+          <dt>Employee ID</dt>
+          <dd>{item.employeeId}</dd>
+        </div>
+        <div>
+          <dt>Application ID</dt>
+          <dd>{item.id}</dd>
+        </div>
         <div>
           <dt>Leave year</dt>
           <dd>
@@ -407,19 +271,28 @@ function EncashmentCard({ item }: { item: Encashment }) {
           <dd>{item.assessedKpiPercent.toFixed(1)}%</dd>
         </div>
         <div>
+          <dt>Policy version</dt>
+          <dd>{item.policyVersionId}</dd>
+        </div>
+        <div>
           <dt>Submitted</dt>
           <dd>{new Date(item.createdAt).toLocaleString()}</dd>
         </div>
-        {latest && (
-          <div>
-            <dt>Latest decision</dt>
-            <dd>
-              {stateLabels[latest.decision] ?? ''} by {latest.actorRole}
-              {latest.reason ? ` — ${latest.reason}` : ''}
-            </dd>
-          </div>
-        )}
       </dl>
-    </article>
+      {item.decisions.length > 0 && (
+        <>
+          <h3>Recorded decisions</h3>
+          <ul>
+            {item.decisions.map((entry) => (
+              <li key={entry.id}>
+                {stateLabels[entry.decision]} by {entry.actorRole} at{' '}
+                {new Date(entry.atUtc).toLocaleString()}
+                {entry.reason ? `: ${entry.reason}` : ''}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }

@@ -1,10 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { z } from 'zod';
-import { Search } from 'lucide-react';
+import { useAuth } from '@/auth/use-auth';
+import { OutstationWorkspace } from '../outstation/OutstationWorkspace';
+import { canDeployment } from '../outstation/contracts';
 import { TextInput } from '@/components/forms/TextInput';
 import { SelectInput } from '@/components/forms/SelectInput';
 import { Button } from '@/components/ui/Button';
-import { Denied, QueryState, ActionMessage } from '../components/Feedback';
+import { Denied, ActionMessage } from '../components/Feedback';
+import { FinanceQueryState as QueryState } from '../components/finance/FinanceQueryState';
+import '../components/finance/allowances.css';
 import { RecordView } from '../components/RecordView';
 import {
   FinanceNotice,
@@ -29,7 +33,6 @@ import {
   allowanceClaim,
   allowanceDetail,
   allowancePage,
-  allowanceSource,
   policyAssignmentPage,
   policyAssignmentResult,
   policyPage,
@@ -37,12 +40,10 @@ import {
   policyPublicationResult,
   policyView,
   policyVersionPage,
-  type AllowanceClaim,
   type PolicyView,
 } from '../schemas/finance';
 
 const permissions = {
-  self: 'attendance.allowances.self',
   review: 'attendance.allowances.review',
   decide: 'attendance.allowances.decide',
   settlement: 'attendance.allowances.settlement',
@@ -50,9 +51,19 @@ const permissions = {
 };
 
 export function AllowancesPage() {
+  const { user, status } = useAuth();
+  const epoch = useMemo(() => crypto.randomUUID(), [user, status]);
+  if (status !== 'authenticated') return <Denied />;
+  return <AllowancesContent key={epoch} />;
+}
+
+function AllowancesContent() {
+  const [outstationBusy, setOutstationBusy] = useState(false);
   const access = useFinanceAccess();
   const tabs = [
-    ...(access.canSelf(permissions.self) ? [{ id: 'claims', label: 'My claims' }] : []),
+    ...(canDeployment(access.user, 'read')
+      ? [{ id: 'outstation', label: 'Outstation management' }]
+      : []),
     ...(access.can(permissions.review) ? [{ id: 'review', label: 'Review queue' }] : []),
     ...(access.can(permissions.policy) ? [{ id: 'policies', label: 'Allowance policies' }] : []),
   ];
@@ -60,13 +71,15 @@ export function AllowancesPage() {
   if (!tabs.length) return <Denied />;
   const active = tabs.some((item) => item.id === tab) ? tab : (tabs[0]?.id ?? '');
   return (
-    <section aria-label="Allowances">
-      <div className="hr-page-heading">
-        <p className="hr-kicker">HR &bull; Attendance money</p>
+    <section className="allowances-page" aria-label="Allowances">
+      <header className="allowances-heading">
+        <p>Human resources / Attendance</p>
         <h1>Allowances</h1>
-      </div>
-      <FinanceTabs tabs={tabs} active={active} onChange={setTab} label="Allowance views" />
-      {active === 'claims' && <AllowanceClaims />}
+      </header>
+      <fieldset disabled={outstationBusy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <FinanceTabs tabs={tabs} active={active} onChange={setTab} label="Allowance views" />
+      </fieldset>
+      {active === 'outstation' && <OutstationWorkspace onBusyChange={setOutstationBusy} />}
       {active === 'review' && (
         <AllowanceReview
           canDecide={access.can(permissions.decide)}
@@ -75,303 +88,6 @@ export function AllowancesPage() {
       )}
       {active === 'policies' && <AllowancePolicies />}
     </section>
-  );
-}
-
-function AllowanceClaims() {
-  const today = new Date().toISOString().slice(0, 10);
-  const initial = useMemo(() => dayRange(30), []);
-  const [businessDate, setBusinessDate] = useState(today);
-  const [kind, setKind] = useState('1');
-  const [reason, setReason] = useState('');
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
-  const [state, setState] = useState('');
-  const [page, setPage] = useState(1);
-  const [claimId, setClaimId] = useState<string | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const action = useFinanceAction();
-
-  const sources = useFinanceQuery(
-    '/me/allowances/sources' + queryString({ businessDate }),
-    allowanceSource,
-    true,
-    z.iso.date().safeParse(businessDate).success,
-  );
-  const history = useFinanceQuery(
-    '/me/allowances/claims' +
-      queryString({
-        from,
-        to,
-        state: state === '' ? undefined : Number(state),
-        page,
-        pageSize: 25,
-      }),
-    allowancePage,
-    true,
-    dayRangeValid(from, to),
-  );
-  const detail = useFinanceQuery(
-    claimId ? `/me/allowances/claims/${claimId}` : '/me/allowances/claims',
-    allowanceDetail,
-    Boolean(claimId),
-    Boolean(claimId),
-  );
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const result = await action.run(
-      '/me/allowances/claims',
-      { kind: Number(kind), businessDate, reason },
-      'POST',
-      allowanceClaim,
-    );
-    if (result) {
-      setReason('');
-      void sources.refetch();
-      void history.refetch();
-    }
-  }
-
-  async function cancel(claim: AllowanceClaim) {
-    if (!window.confirm('Cancel this pending allowance claim?')) return;
-    const result = await action.run(
-      `/me/allowances/claims/${claim.id}/cancel`,
-      { expectedVersion: claim.version, reason: cancelReason },
-      'POST',
-      allowanceClaim,
-    );
-    if (result) {
-      setClaimId(null);
-      setCancelReason('');
-      void history.refetch();
-    }
-  }
-
-  return (
-    <>
-      <section className="hr-form-section">
-        <h2>Eligibility preview</h2>
-        <div className="hr-toolbar">
-          <TextInput
-            label="Business date"
-            type="date"
-            value={businessDate}
-            onChange={(event) => setBusinessDate(event.target.value)}
-          />
-          <Button variant="secondary" onClick={() => void sources.refetch()}>
-            <Search size={16} />
-            Check eligibility
-          </Button>
-        </div>
-        <QueryState query={sources}>
-          {sources.data && (
-            <>
-              <p className="hr-inline">
-                <span className="muted">Policy state</span>
-                <FinanceStatus value={sources.data.policyState} />
-                <span className="muted">Staff category</span>
-                <span>{sources.data.staffCategory}</span>
-                <span className="muted">Currency</span>
-                <span>{sources.data.currency ?? 'Not published'}</span>
-              </p>
-              <div className="hr-table-scroll">
-                <table className="hr-prepared-table">
-                  <thead>
-                    <tr>
-                      <th>Kind</th>
-                      <th>State</th>
-                      <th>Required hours</th>
-                      <th>Verified hours</th>
-                      <th>Policy amount</th>
-                      <th>Claim exists</th>
-                      <th>Server reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sources.data.kinds.map((item) => (
-                      <tr key={item.kind}>
-                        <td>{allowanceKindOptions[item.kind - 1]?.label ?? item.kind}</td>
-                        <td>
-                          <FinanceStatus value={item.state} />
-                        </td>
-                        <td>{item.requiredHours ?? '—'}</td>
-                        <td>{item.continuousHours ?? '—'}</td>
-                        <td>
-                          {item.claimedAmount === null
-                            ? '—'
-                            : money(item.claimedAmount, item.currency)}
-                        </td>
-                        <td>{item.claimExists ? 'Yes' : 'No'}</td>
-                        <td>{item.reason}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </QueryState>
-      </section>
-
-      <section className="hr-form-section">
-        <h2>Submit a claim</h2>
-        <form className="hr-form-grid" onSubmit={(event) => void submit(event)}>
-          <SelectInput
-            label="Allowance kind"
-            value={kind}
-            options={allowanceKindOptions}
-            onChange={(event) => setKind(event.target.value)}
-          />
-          <TextInput
-            label="Business date"
-            type="date"
-            required
-            value={businessDate}
-            onChange={(event) => setBusinessDate(event.target.value)}
-          />
-          <TextAreaField
-            label="Reason"
-            required
-            value={reason}
-            onChange={setReason}
-            disabled={action.pending}
-          />
-          <div className="hr-actions wide">
-            <Button type="submit" disabled={action.pending || !reason.trim()}>
-              Submit claim
-            </Button>
-          </div>
-        </form>
-        <ActionMessage action={action} />
-      </section>
-
-      <section className="hr-form-section">
-        <h2>My claims</h2>
-        <div className="hr-toolbar">
-          <TextInput
-            label="From"
-            type="date"
-            value={from}
-            onChange={(event) => {
-              setFrom(event.target.value);
-              setPage(1);
-            }}
-          />
-          <TextInput
-            label="To"
-            type="date"
-            value={to}
-            onChange={(event) => {
-              setTo(event.target.value);
-              setPage(1);
-            }}
-          />
-          <SelectInput
-            label="State"
-            value={state}
-            options={approvalStateOptions}
-            onChange={(event) => {
-              setState(event.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-        {!dayRangeValid(from, to) && (
-          <p className="hr-message hr-message--error" role="alert">
-            Choose a range ending after the start date and no longer than 366 days.
-          </p>
-        )}
-        <QueryState query={history}>
-          {!history.data?.items.length && <FinanceNotice>No claims in this range.</FinanceNotice>}
-          {history.data?.items.map((claim) => (
-            <article className="hr-repeat" key={claim.id}>
-              <div className="hr-repeat-heading">
-                <h3>
-                  {allowanceKindOptions[claim.kind - 1]?.label ?? claim.kind} &middot;{' '}
-                  <FinanceStatus value={claim.state} />
-                </h3>
-                <div className="hr-actions">
-                  <Button variant="secondary" onClick={() => setClaimId(claim.id)}>
-                    {claimId === claim.id ? 'Close claim' : 'Open claim'}
-                  </Button>
-                </div>
-              </div>
-              <RecordView
-                value={{
-                  claimReference: claim.id,
-                  payableDate: claim.payableDate,
-                  claimedAmount: money(claim.claimedAmount, claim.currency),
-                  settlement: claim.settlementState,
-                  submissionVersion: claim.submissionVersion,
-                  createdAt: labelDate(claim.createdAt),
-                  submittedAt: labelDate(claim.submittedAt),
-                  decidedAt: labelDate(claim.decidedAt),
-                  policyVersion: claim.policyVersionId,
-                  approvalRequest: claim.approvalRequestId,
-                }}
-              />
-              {claimId === claim.id && (
-                <QueryState query={detail}>
-                  {detail.data && (
-                    <>
-                      <RecordView
-                        value={{
-                          serverReason: detail.data.reason,
-                          visibility: detail.data.visibility,
-                          eligibility: detail.data.eligibility.state,
-                          eligibilityReason: detail.data.eligibility.reason,
-                          longestCycleHours: detail.data.eligibility.continuousHours,
-                          requiredHours: detail.data.eligibility.requiredHours,
-                        }}
-                      />
-                      {claim.state === 'Pending' && (
-                        <div className="hr-form-section">
-                          <h3>Cancel claim</h3>
-                          <form
-                            className="hr-form-grid"
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              void cancel(claim);
-                            }}
-                          >
-                            <TextAreaField
-                              label="Cancellation reason"
-                              required
-                              value={cancelReason}
-                              onChange={setCancelReason}
-                              disabled={action.pending}
-                            />
-                            <div className="hr-actions wide">
-                              <Button
-                                type="submit"
-                                variant="danger"
-                                disabled={action.pending || !cancelReason.trim()}
-                              >
-                                Cancel claim
-                              </Button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </QueryState>
-              )}
-            </article>
-          ))}
-          {history.data && (
-            <HasMorePager
-              page={page}
-              hasMore={history.data.hasMore}
-              busy={history.isFetching}
-              onPrevious={() => setPage((value) => Math.max(1, value - 1))}
-              onNext={() => setPage((value) => value + 1)}
-            />
-          )}
-        </QueryState>
-      </section>
-    </>
   );
 }
 
@@ -388,6 +104,7 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
   const [paymentReference, setPaymentReference] = useState('');
   const [settlementReason, setSettlementReason] = useState('');
   const action = useFinanceAction();
+  const employeeFilterValid = !employeeId.trim() || z.uuid().safeParse(employeeId.trim()).success;
 
   const queue = useFinanceQuery(
     '/attendance/allowances/review' +
@@ -401,7 +118,7 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
       }),
     allowancePage,
     true,
-    dayRangeValid(from, to),
+    dayRangeValid(from, to) && employeeFilterValid,
   );
   const detail = useFinanceQuery(
     selected
@@ -414,7 +131,7 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
 
   async function decide(event: FormEvent) {
     event.preventDefault();
-    if (!selected) return;
+    if (!selected || detail.data?.claim.kind === 5) return;
     const result = await action.run(
       `/attendance/allowances/employees/${selected.employeeId}/claims/${selected.id}/decide`,
       {
@@ -434,7 +151,7 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
 
   async function settle(event: FormEvent) {
     event.preventDefault();
-    if (!selected) return;
+    if (!selected || detail.data?.claim.kind === 5) return;
     const result = await action.run(
       `/attendance/allowances/employees/${selected.employeeId}/claims/${selected.id}/settlement`,
       {
@@ -489,6 +206,9 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
             label="Employee id"
             value={employeeId}
             placeholder="All reviewed employees"
+            error={
+              employeeFilterValid ? undefined : 'Enter a complete employee ID or leave it blank.'
+            }
             onChange={(event) => {
               setEmployeeId(event.target.value);
               setPage(1);
@@ -500,136 +220,156 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
             Choose a range ending after the start date and no longer than 366 days.
           </p>
         )}
-        <QueryState query={queue}>
-          {!queue.data?.items.length && <FinanceNotice>No claims match this filter.</FinanceNotice>}
-          {queue.data?.items.map((claim) => (
-            <article className="hr-repeat" key={claim.id}>
-              <div className="hr-repeat-heading">
-                <h3>
-                  {claim.employeeId} &middot;{' '}
-                  {allowanceKindOptions[claim.kind - 1]?.label ?? claim.kind} &middot;{' '}
-                  <FinanceStatus value={claim.state} />
-                </h3>
-                <div className="hr-actions">
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      setSelected(
-                        selected?.id === claim.id
-                          ? null
-                          : { employeeId: claim.employeeId, id: claim.id },
-                      )
-                    }
-                  >
-                    {selected?.id === claim.id ? 'Close claim' : 'Review claim'}
-                  </Button>
+        {dayRangeValid(from, to) && employeeFilterValid && (
+          <QueryState query={queue}>
+            {!queue.data?.items.length && (
+              <FinanceNotice>No claims match this filter.</FinanceNotice>
+            )}
+            {queue.data?.items.map((claim) => (
+              <article className="hr-repeat" key={claim.id}>
+                <div className="hr-repeat-heading">
+                  <h3>
+                    {claim.employeeId} &middot;{' '}
+                    {allowanceKindOptions[claim.kind - 1]?.label ?? claim.kind} &middot;{' '}
+                    <FinanceStatus value={claim.state} />
+                  </h3>
+                  <div className="hr-actions">
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        setSelected(
+                          selected?.id === claim.id
+                            ? null
+                            : { employeeId: claim.employeeId, id: claim.id },
+                        )
+                      }
+                    >
+                      {selected?.id === claim.id ? 'Close claim' : 'Review claim'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <RecordView
-                value={{
-                  claimReference: claim.id,
-                  payableDate: claim.payableDate,
-                  claimedAmount: money(claim.claimedAmount, claim.currency),
-                  settlement: claim.settlementState,
-                  createdAt: labelDate(claim.createdAt),
-                  decidedAt: labelDate(claim.decidedAt),
-                }}
+                <RecordView
+                  value={{
+                    claimReference: claim.id,
+                    payableDate: claim.payableDate,
+                    claimedAmount: money(claim.claimedAmount, claim.currency),
+                    settlement: claim.settlementState,
+                    createdAt: labelDate(claim.createdAt),
+                    decidedAt: labelDate(claim.decidedAt),
+                  }}
+                />
+                {selected?.id === claim.id && (
+                  <QueryState query={detail}>
+                    {detail.data && (
+                      <>
+                        <RecordView
+                          value={{
+                            serverReason: detail.data.reason,
+                            visibility: detail.data.visibility,
+                            eligibility: detail.data.eligibility.state,
+                            eligibilityReason: detail.data.eligibility.reason,
+                            longestCycleHours: detail.data.eligibility.continuousHours,
+                            requiredHours: detail.data.eligibility.requiredHours,
+                          }}
+                        />
+                        {detail.data.claim.kind === 5 && (
+                          <FinanceNotice>
+                            Outstation claims require retained deployment evidence and independent
+                            deployment review. No outstation settlement is available here.
+                          </FinanceNotice>
+                        )}
+                        {canDecide &&
+                          detail.data.claim.kind !== 5 &&
+                          detail.data.claim.state === 'Pending' && (
+                            <div className="hr-form-section">
+                              <h3>Decision</h3>
+                              <form
+                                className="hr-form-grid"
+                                onSubmit={(event) => void decide(event)}
+                              >
+                                <SelectInput
+                                  label="Decision"
+                                  value={decision}
+                                  options={decisionOptions}
+                                  onChange={(event) => setDecision(event.target.value)}
+                                />
+                                <TextAreaField
+                                  label="Decision reason"
+                                  required
+                                  value={decisionReason}
+                                  onChange={setDecisionReason}
+                                  disabled={action.pending}
+                                />
+                                <div className="hr-actions wide">
+                                  <Button
+                                    type="submit"
+                                    disabled={action.pending || !decisionReason.trim()}
+                                  >
+                                    Record decision
+                                  </Button>
+                                </div>
+                              </form>
+                            </div>
+                          )}
+                        {canSettle &&
+                          detail.data.claim.kind !== 5 &&
+                          detail.data.claim.settlementState === 'InPayrollHandoff' && (
+                            <div className="hr-form-section">
+                              <h3>Record payroll payment</h3>
+                              <p className="muted">
+                                Only an approved claim already scheduled by a locked payroll handoff
+                                can be recorded as paid.
+                              </p>
+                              <form
+                                className="hr-form-grid"
+                                onSubmit={(event) => void settle(event)}
+                              >
+                                <TextInput
+                                  label="External payment reference"
+                                  required
+                                  maxLength={150}
+                                  value={paymentReference}
+                                  onChange={(event) => setPaymentReference(event.target.value)}
+                                />
+                                <TextAreaField
+                                  label="Reason"
+                                  required
+                                  value={settlementReason}
+                                  onChange={setSettlementReason}
+                                  disabled={action.pending}
+                                />
+                                <div className="hr-actions wide">
+                                  <Button
+                                    type="submit"
+                                    disabled={
+                                      action.pending ||
+                                      !paymentReference.trim() ||
+                                      !settlementReason.trim()
+                                    }
+                                  >
+                                    Record payment
+                                  </Button>
+                                </div>
+                              </form>
+                            </div>
+                          )}
+                      </>
+                    )}
+                  </QueryState>
+                )}
+              </article>
+            ))}
+            {queue.data && (
+              <HasMorePager
+                page={page}
+                hasMore={queue.data.hasMore}
+                busy={queue.isFetching}
+                onPrevious={() => setPage((value) => Math.max(1, value - 1))}
+                onNext={() => setPage((value) => value + 1)}
               />
-              {selected?.id === claim.id && (
-                <QueryState query={detail}>
-                  {detail.data && (
-                    <>
-                      <RecordView
-                        value={{
-                          serverReason: detail.data.reason,
-                          visibility: detail.data.visibility,
-                          eligibility: detail.data.eligibility.state,
-                          eligibilityReason: detail.data.eligibility.reason,
-                          longestCycleHours: detail.data.eligibility.continuousHours,
-                          requiredHours: detail.data.eligibility.requiredHours,
-                        }}
-                      />
-                      {canDecide && detail.data.claim.state === 'Pending' && (
-                        <div className="hr-form-section">
-                          <h3>Decision</h3>
-                          <form className="hr-form-grid" onSubmit={(event) => void decide(event)}>
-                            <SelectInput
-                              label="Decision"
-                              value={decision}
-                              options={decisionOptions}
-                              onChange={(event) => setDecision(event.target.value)}
-                            />
-                            <TextAreaField
-                              label="Decision reason"
-                              required
-                              value={decisionReason}
-                              onChange={setDecisionReason}
-                              disabled={action.pending}
-                            />
-                            <div className="hr-actions wide">
-                              <Button
-                                type="submit"
-                                disabled={action.pending || !decisionReason.trim()}
-                              >
-                                Record decision
-                              </Button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
-                      {canSettle && detail.data.claim.settlementState === 'InPayrollHandoff' && (
-                        <div className="hr-form-section">
-                          <h3>Record payroll payment</h3>
-                          <p className="muted">
-                            Only an approved claim already scheduled by a locked payroll handoff can
-                            be recorded as paid.
-                          </p>
-                          <form className="hr-form-grid" onSubmit={(event) => void settle(event)}>
-                            <TextInput
-                              label="External payment reference"
-                              required
-                              maxLength={150}
-                              value={paymentReference}
-                              onChange={(event) => setPaymentReference(event.target.value)}
-                            />
-                            <TextAreaField
-                              label="Reason"
-                              required
-                              value={settlementReason}
-                              onChange={setSettlementReason}
-                              disabled={action.pending}
-                            />
-                            <div className="hr-actions wide">
-                              <Button
-                                type="submit"
-                                disabled={
-                                  action.pending ||
-                                  !paymentReference.trim() ||
-                                  !settlementReason.trim()
-                                }
-                              >
-                                Record payment
-                              </Button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </QueryState>
-              )}
-            </article>
-          ))}
-          {queue.data && (
-            <HasMorePager
-              page={page}
-              hasMore={queue.data.hasMore}
-              busy={queue.isFetching}
-              onPrevious={() => setPage((value) => Math.max(1, value - 1))}
-              onNext={() => setPage((value) => value + 1)}
-            />
-          )}
-        </QueryState>
+            )}
+          </QueryState>
+        )}
         <ActionMessage action={action} />
       </section>
     </>
@@ -1238,7 +978,7 @@ function AllowancePolicies() {
 }
 
 function dayRangeValid(from: string, to: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return false;
+  if (!z.iso.date().safeParse(from).success || !z.iso.date().safeParse(to).success) return false;
   const start = Date.parse(from);
   const end = Date.parse(to);
   if (Number.isNaN(start) || Number.isNaN(end)) return false;

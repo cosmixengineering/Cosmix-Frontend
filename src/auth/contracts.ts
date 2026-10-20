@@ -33,3 +33,16 @@ export const grantsSchema = z.array(
 );
 export type CurrentAccount = z.infer<typeof accountSchema>;
 export type PermissionGrant = z.infer<typeof grantsSchema>[number];
+
+export function isSystemAdmin(
+  user: { grants?: readonly { permission: string }[] } | null | undefined,
+): boolean {
+  return Boolean(
+    user?.grants?.some(
+      (g) =>
+        g.permission.startsWith('access.roles.') ||
+        g.permission.startsWith('access.accounts.') ||
+        g.permission.startsWith('admin.'),
+    ),
+  );
+}

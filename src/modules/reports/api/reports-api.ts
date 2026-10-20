@@ -9,6 +9,8 @@ import {
 } from '../schemas/report-contracts';
 
 export { queryString, reportQuery };
+// Preserve the current-page helper name through the validated /export-page transport.
+export { exportReportPage as exportReport } from './report-export-jobs';
 
 export async function fetchReportTypes(signal?: AbortSignal): Promise<string[]> {
   return reportTypeList.parse(await request('/hr/reports/types', { signal }));
@@ -20,25 +22,6 @@ export async function fetchReport(reportType: string, filter: ReportFilter, sign
       signal,
     }),
   );
-}
-
-// Export returns a file body (csv or xlsx), not JSON. The shared request helper already
-// applies the session cookie and CSRF header; no idempotency key is required by this endpoint.
-export async function exportReport(
-  reportType: string,
-  format: number,
-  reason: string,
-  filter: ReportFilter,
-  signal: AbortSignal,
-): Promise<Blob> {
-  const body = await request(`/hr/reports/${encodeURIComponent(reportType)}/export`, {
-    method: 'POST',
-    body: { format, reason, filter },
-    responseType: 'blob',
-    signal,
-  });
-  if (!(body instanceof Blob)) throw new Error('Invalid export response.');
-  return body;
 }
 
 export const reportExportRequestSchema = z.object({

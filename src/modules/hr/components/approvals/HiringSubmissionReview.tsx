@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Check, CornerUpLeft, X, RefreshCw } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Check, CornerUpLeft, X, RefreshCw, MapPin, KeyRound, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SelectInput } from '@/components/forms/SelectInput';
 import { useHrAccess } from '../../hooks/use-hr-access';
@@ -20,6 +20,8 @@ import {
 import { employeePage, writeResult } from '../../schemas/contracts';
 import { masterSchema } from '../../schemas/organization';
 import { onboardingLabels } from '../../types/contracts';
+import type { EmployeeWriteResult } from '../../types/contracts';
+import { businessDate, resolutionSchema } from '../../staff-taxonomy/contracts';
 import { queryString } from '../../api/hr-api';
 import { labelDate } from '../../utils/messages';
 import { QueryState, ActionMessage, Denied } from '../Feedback';
@@ -27,6 +29,10 @@ import { RecordView } from '../RecordView';
 import { LongField } from '../hiring/FormFields';
 import { ReferenceField } from '../ReferenceField';
 import { SubmissionDocuments } from './SubmissionDocuments';
+import {
+  SubmittedEmploymentSummary,
+  employmentReferenceFields,
+} from './SubmittedEmploymentSummary';
 
 const permissions = [
   'hr.employees.read',
@@ -42,11 +48,13 @@ export function HiringSubmissionReview({
   onBusy,
 }: {
   submission: SubmissionSummary;
-  onSaved: (decision: string) => void;
+  onSaved: (decision: string, result: EmployeeWriteResult) => void;
   onDirty?: (dirty: boolean) => void;
   onBusy?: (busy: boolean) => void;
 }) {
   const access = useHrAccess();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
   const [tab, setTab] = useState('profile');
   const [decision, setDecision] = useState(1);
   const [reason, setReason] = useState<string | null>(null);
@@ -61,7 +69,12 @@ export function HiringSubmissionReview({
   } | null>(null);
   const query = useHrQuery(
     `employees/${submission.employeeId}/submissions/${submission.id}`,
-    submissionProfileSchema,
+    submissionProfileSchema.refine(
+      (data) =>
+        data.submissionId === submission.id &&
+        data.employeeId === submission.employeeId &&
+        data.version === submission.version,
+    ),
     permissions,
   );
   // This directory read supplies the current employee rowversion without reading a mutable hiring snapshot.
@@ -88,7 +101,30 @@ export function HiringSubmissionReview({
     ['hr.organization.read'],
     !!categoryId,
   );
-  const siteStaff = category.data?.code === 'SITE';
+  const categoryCode = category.data?.code ?? '';
+  const today = businessDate();
+  const canReadTaxonomy = access.can('hr.staff-taxonomy.read');
+  const taxonomy = useHrQuery(
+    'staff-taxonomy/effective' + queryString({ categoryCode, on: today }),
+    resolutionSchema(categoryCode, today),
+    ['hr.staff-taxonomy.read'],
+    !!categoryCode,
+  );
+  const baselineLocation = categoryCode === 'SITE' ? 2 : categoryCode === 'OFFICE' ? 1 : null;
+  const workLocation = canReadTaxonomy
+    ? taxonomy.data?.available && !taxonomy.isError && !taxonomy.isFetching
+      ? taxonomy.data.mapping?.workLocation
+      : null
+    : baselineLocation;
+  const categoryReady =
+    access.can('hr.organization.read') &&
+    !!category.data &&
+    !category.isError &&
+    !category.isFetching &&
+    category.data.id === categoryId;
+  const placementReady = categoryReady && !!workLocation;
+  const siteStaff = placementReady && workLocation === 2;
+  const siteRequired = siteStaff && taxonomy.data?.mapping?.requireSiteBeforeActivation === true;
   const financial = useHrQuery(
     `employees/${submission.employeeId}/submissions/${submission.id}/financial`,
     financialSchema.nullable(),
@@ -103,7 +139,11 @@ export function HiringSubmissionReview({
   );
   const setup = useHrQuery(
     `employees/${submission.employeeId}/access-setup`,
-    accessSetupSchema,
+    accessSetupSchema.refine(
+      (data) =>
+        data.employeeId === submission.employeeId &&
+        (!data.account || data.account.employeeId === submission.employeeId),
+    ),
     ['hr.employees.submissions.review', 'access.accounts.read'],
     employee?.onboardingStatus === 2,
   );
@@ -122,8 +162,10 @@ export function HiringSubmissionReview({
     submission.employeeId === access.user?.account?.employeeId;
   const pending =
     submission.status === 1 && employee?.onboardingStatus === 1 && employee.status === 1;
-  const canApprove =
+  const documentsReady =
     !!query.data &&
+    !query.isError &&
+    !query.isFetching &&
     !documents.isFetching &&
     !documents.isError &&
     !!documents.data &&
@@ -131,6 +173,12 @@ export function HiringSubmissionReview({
       const live = documents.data?.find((r) => r.id === d.id);
       return d.isAvailable && live?.isAvailable && live.version === d.version;
     });
+  const canApprove =
+    documentsReady &&
+    placementReady &&
+    (!siteRequired || !!initialSiteId) &&
+    !current.isFetching &&
+    !current.isError;
   const tabs = [
     { key: 'profile', label: 'Submitted profile' },
     { key: 'documents', label: 'Documents' },
@@ -145,6 +193,7 @@ export function HiringSubmissionReview({
       <p className="muted">
         Submission revision {submission.version} &middot; {labelDate(submission.submittedAt)}
       </p>
+      {query.data && !query.isError && <SubmittedEmploymentSummary profile={query.data.profile} />}
       <nav className="hr-tabs" aria-label="Submission review sections">
         {tabs.map((t) => (
           <button
@@ -160,7 +209,12 @@ export function HiringSubmissionReview({
       <QueryState query={query}>
         {query.data && (
           <>
-            {tab === 'profile' && <RecordView value={query.data.profile} />}
+            {tab === 'profile' && (
+              <RecordView
+                value={query.data.profile}
+                omit={[...employmentReferenceFields, 'joinedOn']}
+              />
+            )}
             {tab === 'documents' && (
               <SubmissionDocuments
                 employeeId={submission.employeeId}
@@ -211,6 +265,13 @@ export function HiringSubmissionReview({
           </>
         )}
       </QueryState>
+      {query.isError && (
+        <p className="hr-notice">
+          The retained submission could not be loaded. No hiring decision can be recorded from
+          missing evidence. Current employee details and access setup are separate from the original
+          submission.
+        </p>
+      )}
       <QueryState query={current}>
         {!employee && current.data && (
           <p role="alert">The employee record is no longer available.</p>
@@ -219,6 +280,32 @@ export function HiringSubmissionReview({
           <p className="hr-notice">
             Current hiring state: {onboardingLabels[employee.onboardingStatus]}.
           </p>
+        )}
+        {employee?.onboardingStatus === 2 && (
+          <div className="hr-actions" aria-label="Approved employee setup">
+            <Link
+              className="button button--secondary"
+              to={`${basePath}/employees/${submission.employeeId}`}
+            >
+              <UserRound size={16} /> Employee details
+            </Link>
+            {siteStaff && access.can('hr.sites.read') && (
+              <Link
+                className="button button--secondary"
+                to={`${basePath}/employees/${submission.employeeId}?section=assignments`}
+              >
+                <MapPin size={16} /> Site assignment
+              </Link>
+            )}
+            {access.can('access.accounts.read') && (
+              <Link
+                className="button button--secondary"
+                to={`${basePath}/employees/${submission.employeeId}?section=access`}
+              >
+                <KeyRound size={16} /> Roles &amp; software access
+              </Link>
+            )}
+          </div>
         )}
         {employee?.onboardingStatus === 2 && access.can('access.accounts.read') && (
           <QueryState query={setup}>
@@ -254,12 +341,6 @@ export function HiringSubmissionReview({
                     <dd>{setup.data.account?.webAccessEnabled ? 'Yes' : 'No'}</dd>
                   </div>
                 </dl>
-                <Link
-                  className="button button--secondary"
-                  to={`/hr/employees/${submission.employeeId}?section=access`}
-                >
-                  Manage account access
-                </Link>
               </section>
             )}
           </QueryState>
@@ -276,6 +357,12 @@ export function HiringSubmissionReview({
             setError('');
             if (!employee || !reviewed || action.pending || (decision !== 1 && !reason?.trim()))
               return;
+            if (decision === 1 && !canApprove) {
+              setError(
+                'Review current documents, staff classification and required site assignment before approval.',
+              );
+              return;
+            }
             if (
               query.data?.submissionId !== submission.id ||
               query.data.employeeId !== submission.employeeId
@@ -303,7 +390,11 @@ export function HiringSubmissionReview({
                 `employees/${submission.employeeId}/submissions/${submission.id}/decision`,
                 body,
                 'POST',
-                writeResult,
+                writeResult.refine(
+                  (result) =>
+                    result.employeeId === submission.employeeId &&
+                    result.submissionId === submission.id,
+                ),
                 () => setPayload(null),
               )
               .then((result) => {
@@ -311,7 +402,11 @@ export function HiringSubmissionReview({
                   setReason(null);
                   setReviewed(false);
                   setInitialSiteId('');
-                  onSaved(decisions[decision - 1] ?? 'Recorded');
+                  setPayload(null);
+                  setDecision(1);
+                  onSaved(decisions[decision - 1] ?? 'Recorded', result);
+                  void current.refetch();
+                  void history.refetch();
                 }
               });
           }}
@@ -339,9 +434,25 @@ export function HiringSubmissionReview({
                 <ReferenceField
                   label="Initial site assignment"
                   kind="sites"
+                  required={siteRequired}
+                  enableFind
                   value={initialSiteId || null}
                   onChange={(id) => setInitialSiteId(id ?? '')}
                 />
+              )}
+              {decision === 1 && siteStaff && !access.can('hr.sites.read') && (
+                <p className="hr-notice">
+                  Site selection requires site-read permission.{' '}
+                  {siteRequired
+                    ? 'This staff category requires a site before approval.'
+                    : 'Site assignment remains pending until an authorized Admin assigns it.'}
+                </p>
+              )}
+              {decision === 1 && placementReady && workLocation === 1 && (
+                <p className="hr-notice">
+                  Office placement: the submitted office / branch. Roles and software access are
+                  assigned separately after hiring approval.
+                </p>
               )}
               <label className="hr-check">
                 <input
@@ -353,8 +464,17 @@ export function HiringSubmissionReview({
                 I have reviewed this submission and its supporting evidence.
               </label>
             </fieldset>
-            {!canApprove && decision === 1 && (
+            {!documentsReady && decision === 1 && (
               <p role="alert">Submitted documents are unavailable. Approval cannot proceed.</p>
+            )}
+            {!placementReady && decision === 1 && (
+              <p role="alert">
+                Staff classification is unavailable. Organization access and an effective category
+                mapping are required before choosing the placement.
+              </p>
+            )}
+            {siteRequired && !initialSiteId && decision === 1 && (
+              <p role="alert">Select an initial site required by this staff category.</p>
             )}
             <div className="hr-actions">
               <Button type="submit" disabled={!reviewed || (decision === 1 && !canApprove)}>
@@ -374,7 +494,6 @@ export function HiringSubmissionReview({
               {error}
             </p>
           )}
-          <ActionMessage action={action} />
           {action.errorStatus !== null && action.errorStatus >= 400 && action.errorStatus < 500 && (
             <Button
               variant="secondary"
@@ -385,6 +504,8 @@ export function HiringSubmissionReview({
                 void current.refetch();
                 void documents.refetch();
                 void query.refetch();
+                void category.refetch();
+                if (canReadTaxonomy && categoryCode) void taxonomy.refetch();
               }}
             >
               <RefreshCw size={16} />
@@ -393,6 +514,7 @@ export function HiringSubmissionReview({
           )}
         </form>
       )}
+      <ActionMessage action={action} />
     </>
   );
 }

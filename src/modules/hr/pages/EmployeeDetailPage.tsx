@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Activity,
   ArrowLeft,
@@ -78,13 +78,15 @@ export function EmployeeDetailPage() {
 }
 function EmployeeWorkspace({ employeeId }: { employeeId: string }) {
   const access = useHrAccess();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
   const [params] = useSearchParams();
   const name = params.get('section') ?? 'basic';
   const section = sections.find((s) => s.name === name);
   if (!access.can('hr.employees.read')) return <Denied />;
   return (
     <>
-      <Link className="hr-back" to="/hr/employees">
+      <Link className="hr-back" to={`${basePath}/employees`}>
         <ArrowLeft size={16} />
         Back to Employees
       </Link>
@@ -207,7 +209,7 @@ function EmployeeWorkspace({ employeeId }: { employeeId: string }) {
           .map((family) => (
             <Link
               key={family.kind}
-              to={`/hr/employees/${employeeId}/${family.segment}`}
+              to={`${basePath}/employees/${employeeId}/${family.segment}`}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               {getFamilyIcon(family.kind)}

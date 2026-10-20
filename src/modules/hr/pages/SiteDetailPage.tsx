@@ -1,1013 +1,465 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Building2,
-  Calendar,
-  Clock,
-  Mail,
-  MapPin,
-  Phone,
-  Radio,
-  RefreshCw,
-  Search,
-  ShieldCheck,
-  Target,
-  User,
-  UserCheck,
-  Users,
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, ExternalLink, MapPin, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { z } from 'zod';
+import type * as Leaflet from 'leaflet';
 import { Button } from '@/components/ui/Button';
 import { useHrAccess } from '../hooks/use-hr-access';
 import { useHrQuery } from '../hooks/use-hr-queries';
 import { useAttendanceQuery } from '@/modules/attendance/hooks/use-attendance-query';
 import { siteSchema } from '../schemas/sites';
-import { pageOf, employeeSchema } from '../schemas/contracts';
 import { geofenceConfiguration } from '@/modules/attendance/schemas/site-geofences';
 import { Denied } from '../components/Feedback';
-import { SiteLeafletMap } from '../components/sites/SiteLeafletMap';
+import 'leaflet/dist/leaflet.css';
 import '@/styles/site-detail.css';
 
-type SiteConfig = {
-  lat: number;
-  lon: number;
-  radius: number;
-  accuracy: number;
-  shiftName: string;
-  shiftTime: string;
-  breakTime: string;
-  weekdays: string;
-  supervisorName: string;
-  supervisorRole: string;
-  supervisorPhone: string;
-  supervisorEmail: string;
-  defaultWorkers: Array<{
-    name: string;
-    number: number;
-    role: string;
-    phone: string;
-    email: string;
-    checkIn: string;
-    faceScore: string;
-    distanceMeters: number;
-    angleDeg: number;
-    isInside: boolean;
-  }>;
+const workerIdentity = {
+  employeeId: z.uuid(),
+  employeeNumber: z.number().int().nonnegative(),
+  fullLegalName: z.string(),
+  designationName: z.string(),
 };
+const checkInLocation = z.object({
+  ...workerIdentity,
+  checkInTimeUtc: z.iso.datetime({ offset: true }),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
+  accuracyMeters: z.number().nonnegative().nullable(),
+});
+const operationalDetails = z.object({
+  siteId: z.uuid(),
+  supervisor: z
+    .object({
+      supervisorId: z.uuid(),
+      fullLegalName: z.string(),
+      designationName: z.string().nullable(),
+      personalPhone: z.string().nullable(),
+      officialEmail: z.string().nullable(),
+    })
+    .nullable(),
+  assignedWorkers: z.array(
+    z.object({
+      ...workerIdentity,
+      departmentName: z.string(),
+      personalPhone: z.string().nullable(),
+      status: z.string(),
+      effectiveFrom: z.iso.date(),
+    }),
+  ),
+  activeWorkersOnDuty: z.array(checkInLocation),
+});
+type CheckInLocation = z.infer<typeof checkInLocation>;
+type Boundary = NonNullable<z.infer<typeof geofenceConfiguration>['boundary']>;
 
-const FALLBACK_SITE_CONFIG: SiteConfig = {
-  lat: 33.6844,
-  lon: 73.0479,
-  radius: 450,
-  accuracy: 30,
-  shiftName: 'Site Operations Day Shift',
-  shiftTime: '07:30 AM — 04:30 PM',
-  breakTime: '60 mins lunch break',
-  weekdays: 'Monday to Saturday (6 Days)',
-  supervisorName: 'Engr. Tariq Mehmood',
-  supervisorRole: 'Site Supervisor / Resident Engineer',
-  supervisorPhone: '+12025550102',
-  supervisorEmail: 'admin@example.invalid',
-  defaultWorkers: [
-    {
-      name: 'Hamza Farooq',
-      number: 6,
-      role: 'Chief Quantity Surveyor',
-      phone: '+923001234006',
-      email: 'hamza.farooq@cosmixerp.com',
-      checkIn: '07:25 AM',
-      faceScore: '99.4%',
-      distanceMeters: 42,
-      angleDeg: 35,
-      isInside: true,
-    },
-    {
-      name: 'Fahad Mustafa',
-      number: 7,
-      role: 'HSE Safety Officer',
-      phone: '+923001234007',
-      email: 'fahad.mustafa@cosmixerp.com',
-      checkIn: '07:18 AM',
-      faceScore: '98.8%',
-      distanceMeters: 110,
-      angleDeg: 120,
-      isInside: true,
-    },
-    {
-      name: 'Daniyal Hassan',
-      number: 14,
-      role: 'Assistant Quantity Surveyor',
-      phone: '+923001234014',
-      email: 'daniyal.hassan@cosmixerp.com',
-      checkIn: '07:30 AM',
-      faceScore: '99.1%',
-      distanceMeters: 85,
-      angleDeg: 215,
-      isInside: true,
-    },
-    {
-      name: 'Engr. Tariq Mehmood',
-      number: 2,
-      role: 'Site Supervisor',
-      phone: '+12025550102',
-      email: 'admin@example.invalid',
-      checkIn: '07:10 AM',
-      faceScore: '99.7%',
-      distanceMeters: 18,
-      angleDeg: 290,
-      isInside: true,
-    },
-    {
-      name: 'Naveed Akhtar',
-      number: 21,
-      role: 'Site Security & Gate Marshall',
-      phone: '+923001234021',
-      email: 'naveed.akhtar@cosmixerp.com',
-      checkIn: '07:05 AM',
-      faceScore: '99.0%',
-      distanceMeters: 395,
-      angleDeg: 175,
-      isInside: true,
-    },
-  ],
-};
+function timestamp(value: string | number) {
+  return new Date(value)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\.\d{3}Z$/, ' UTC');
+}
 
-// Preset site defaults in case of unconfigured site versions
-const SITE_DEFAULTS: Record<string, SiteConfig> = {
-  'SITE-PRJ-01': {
-    lat: 33.6844,
-    lon: 73.0479,
-    radius: 450,
-    accuracy: 30,
-    shiftName: 'Site Operations Day Shift',
-    shiftTime: '07:30 AM — 04:30 PM',
-    breakTime: '60 mins lunch break',
-    weekdays: 'Monday to Saturday (6 Days)',
-    supervisorName: 'Engr. Tariq Mehmood',
-    supervisorRole: 'Site Supervisor / Resident Engineer',
-    supervisorPhone: '+12025550102',
-    supervisorEmail: 'admin@example.invalid',
-    defaultWorkers: [
-      {
-        name: 'Hamza Farooq',
-        number: 6,
-        role: 'Chief Quantity Surveyor',
-        phone: '+923001234006',
-        email: 'hamza.farooq@cosmixerp.com',
-        checkIn: '07:25 AM',
-        faceScore: '99.4%',
-        distanceMeters: 42,
-        angleDeg: 35,
-        isInside: true,
-      },
-      {
-        name: 'Fahad Mustafa',
-        number: 7,
-        role: 'HSE Safety Officer',
-        phone: '+923001234007',
-        email: 'fahad.mustafa@cosmixerp.com',
-        checkIn: '07:18 AM',
-        faceScore: '98.8%',
-        distanceMeters: 110,
-        angleDeg: 120,
-        isInside: true,
-      },
-      {
-        name: 'Daniyal Hassan',
-        number: 14,
-        role: 'Assistant Quantity Surveyor',
-        phone: '+923001234014',
-        email: 'daniyal.hassan@cosmixerp.com',
-        checkIn: '07:30 AM',
-        faceScore: '99.1%',
-        distanceMeters: 85,
-        angleDeg: 215,
-        isInside: true,
-      },
-      {
-        name: 'Engr. Tariq Mehmood',
-        number: 2,
-        role: 'Site Supervisor',
-        phone: '+12025550102',
-        email: 'admin@example.invalid',
-        checkIn: '07:10 AM',
-        faceScore: '99.7%',
-        distanceMeters: 18,
-        angleDeg: 290,
-        isInside: true,
-      },
-      {
-        name: 'Naveed Akhtar',
-        number: 21,
-        role: 'Site Security & Gate Marshall',
-        phone: '+923001234021',
-        email: 'naveed.akhtar@cosmixerp.com',
-        checkIn: '07:05 AM',
-        faceScore: '99.0%',
-        distanceMeters: 395,
-        angleDeg: 175,
-        isInside: true,
-      },
-    ],
-  },
-  'SITE-PRJ-02': {
-    lat: 31.482,
-    lon: 74.303,
-    radius: 750,
-    accuracy: 35,
-    shiftName: 'Site Operations Day Shift',
-    shiftTime: '07:30 AM — 04:30 PM',
-    breakTime: '60 mins lunch break',
-    weekdays: 'Monday to Saturday (6 Days)',
-    supervisorName: 'Engr. Bilal Aslam',
-    supervisorRole: 'Senior Civil Engineer / Project In-Charge',
-    supervisorPhone: '+923001234004',
-    supervisorEmail: 'bilal.aslam@cosmixerp.com',
-    defaultWorkers: [
-      {
-        name: 'Engr. Bilal Aslam',
-        number: 4,
-        role: 'Senior Civil Engineer',
-        phone: '+923001234004',
-        email: 'bilal.aslam@cosmixerp.com',
-        checkIn: '07:15 AM',
-        faceScore: '99.6%',
-        distanceMeters: 25,
-        angleDeg: 45,
-        isInside: true,
-      },
-      {
-        name: 'Zeeshan Ali',
-        number: 8,
-        role: 'QA/QC Materials Inspector',
-        phone: '+923001234008',
-        email: 'zeeshan.ali@cosmixerp.com',
-        checkIn: '07:22 AM',
-        faceScore: '98.9%',
-        distanceMeters: 140,
-        angleDeg: 95,
-        isInside: true,
-      },
-      {
-        name: 'Arsalan Baig',
-        number: 9,
-        role: 'Senior Land Surveyor',
-        phone: '+923001234009',
-        email: 'arsalan.baig@cosmixerp.com',
-        checkIn: '07:28 AM',
-        faceScore: '99.2%',
-        distanceMeters: 310,
-        angleDeg: 230,
-        isInside: true,
-      },
-      {
-        name: 'Saad Munir',
-        number: 13,
-        role: 'Site Engineer Trainee',
-        phone: '+923001234013',
-        email: 'saad.munir@cosmixerp.com',
-        checkIn: '07:35 AM',
-        faceScore: '98.5%',
-        distanceMeters: 190,
-        angleDeg: 310,
-        isInside: true,
-      },
-      {
-        name: 'Adeel Ahmed',
-        number: 17,
-        role: 'Assistant Land Surveyor',
-        phone: '+923001234017',
-        email: 'adeel.ahmed@cosmixerp.com',
-        checkIn: '07:32 AM',
-        faceScore: '99.0%',
-        distanceMeters: 620,
-        angleDeg: 150,
-        isInside: true,
-      },
-    ],
-  },
-  'SITE-LHR-HQ': {
-    lat: 31.5204,
-    lon: 74.3587,
-    radius: 250,
-    accuracy: 25,
-    shiftName: 'Corporate General Shift',
-    shiftTime: '09:00 AM — 05:30 PM',
-    breakTime: '45 mins lunch & prayer break',
-    weekdays: 'Monday to Friday (5 Days)',
-    supervisorName: 'Engr. Imran Saeed',
-    supervisorRole: 'Project Director & Executive Lead',
-    supervisorPhone: '+12025550101',
-    supervisorEmail: 'superadmin@example.invalid',
-    defaultWorkers: [
-      {
-        name: 'Engr. Imran Saeed',
-        number: 1,
-        role: 'Project Director',
-        phone: '+12025550101',
-        email: 'superadmin@example.invalid',
-        checkIn: '08:50 AM',
-        faceScore: '99.8%',
-        distanceMeters: 15,
-        angleDeg: 10,
-        isInside: true,
-      },
-      {
-        name: 'Noman Qureshi',
-        number: 10,
-        role: 'Senior Site Accountant',
-        phone: '+923001234010',
-        email: 'noman.qureshi@cosmixerp.com',
-        checkIn: '08:55 AM',
-        faceScore: '99.2%',
-        distanceMeters: 55,
-        angleDeg: 120,
-        isInside: true,
-      },
-      {
-        name: 'Kashif Rauf',
-        number: 11,
-        role: 'Procurement Specialist',
-        phone: '+923001234011',
-        email: 'kashif.rauf@cosmixerp.com',
-        checkIn: '09:02 AM',
-        faceScore: '98.9%',
-        distanceMeters: 75,
-        angleDeg: 240,
-        isInside: true,
-      },
-    ],
-  },
-  'SITE-FAC-01': {
-    lat: 31.28,
-    lon: 74.18,
-    radius: 600,
-    accuracy: 30,
-    shiftName: 'Site Operations Day Shift',
-    shiftTime: '07:30 AM — 04:30 PM',
-    breakTime: '60 mins lunch break',
-    weekdays: 'Monday to Saturday (6 Days)',
-    supervisorName: 'Muhammad Rashid',
-    supervisorRole: 'Lead Engineer & Workshop Head',
-    supervisorPhone: '+12025550103',
-    supervisorEmail: 'hr@example.invalid',
-    defaultWorkers: [
-      {
-        name: 'Muhammad Rashid',
-        number: 3,
-        role: 'Lead Engineer',
-        phone: '+12025550103',
-        email: 'hr@example.invalid',
-        checkIn: '07:12 AM',
-        faceScore: '99.5%',
-        distanceMeters: 30,
-        angleDeg: 60,
-        isInside: true,
-      },
-      {
-        name: 'Usman Ghani',
-        number: 5,
-        role: 'MEP Operations Manager',
-        phone: '+923001234005',
-        email: 'usman.ghani@cosmixerp.com',
-        checkIn: '07:20 AM',
-        faceScore: '99.0%',
-        distanceMeters: 120,
-        angleDeg: 170,
-        isInside: true,
-      },
-      {
-        name: 'Salman Tariq',
-        number: 18,
-        role: 'Accounts Assistant',
-        phone: '+923001234018',
-        email: 'salman.tariq@cosmixerp.com',
-        checkIn: '07:28 AM',
-        faceScore: '98.7%',
-        distanceMeters: 90,
-        angleDeg: 280,
-        isInside: true,
-      },
-      {
-        name: 'Babar Azam',
-        number: 19,
-        role: 'Site Store Assistant',
-        phone: '+923001234019',
-        email: 'babar.azam@cosmixerp.com',
-        checkIn: '07:25 AM',
-        faceScore: '99.1%',
-        distanceMeters: 450,
-        angleDeg: 330,
-        isInside: true,
-      },
-    ],
-  },
-  'SITE-PRJ-03': {
-    lat: 25.1264,
-    lon: 62.3226,
-    radius: 1000,
-    accuracy: 40,
-    shiftName: 'Site Concrete Night Shift',
-    shiftTime: '08:00 PM — 05:00 AM (Next Day)',
-    breakTime: '60 mins dinner break',
-    weekdays: 'Monday to Saturday (Night Cycle)',
-    supervisorName: 'Hamza Farooq',
-    supervisorRole: 'Chief Quantity Surveyor / Port Lead',
-    supervisorPhone: '+923001234006',
-    supervisorEmail: 'hamza.farooq@cosmixerp.com',
-    defaultWorkers: [
-      {
-        name: 'Hamza Farooq',
-        number: 6,
-        role: 'Chief Quantity Surveyor',
-        phone: '+923001234006',
-        email: 'hamza.farooq@cosmixerp.com',
-        checkIn: '07:50 PM',
-        faceScore: '99.6%',
-        distanceMeters: 40,
-        angleDeg: 40,
-        isInside: true,
-      },
-      {
-        name: 'Adnan Siddiqui',
-        number: 12,
-        role: 'Site Inventory Supervisor',
-        phone: '+923001234012',
-        email: 'adnan.siddiqui@cosmixerp.com',
-        checkIn: '07:55 PM',
-        faceScore: '99.2%',
-        distanceMeters: 180,
-        angleDeg: 110,
-        isInside: true,
-      },
-      {
-        name: 'Umair Shahid',
-        number: 15,
-        role: 'Junior MEP Engineer',
-        phone: '+923001234015',
-        email: 'umair.shahid@cosmixerp.com',
-        checkIn: '08:02 PM',
-        faceScore: '98.9%',
-        distanceMeters: 360,
-        angleDeg: 210,
-        isInside: true,
-      },
-      {
-        name: 'Waleed Raza',
-        number: 16,
-        role: 'HSE Assistant',
-        phone: '+923001234016',
-        email: 'waleed.raza@cosmixerp.com',
-        checkIn: '07:58 PM',
-        faceScore: '99.0%',
-        distanceMeters: 740,
-        angleDeg: 300,
-        isInside: true,
-      },
-    ],
-  },
-};
+function RecordedSiteMap({
+  boundary,
+  locations,
+}: {
+  boundary: Boundary;
+  locations: CheckInLocation[];
+}) {
+  const container = useRef<HTMLDivElement>(null);
+  const [mapError, setMapError] = useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+    let map: Leaflet.Map | undefined;
+    let observer: ResizeObserver | undefined;
+    void import('leaflet')
+      .then((L) => {
+        if (disposed || !container.current) return;
+        map = L.map(container.current, { scrollWheelZoom: false });
+        const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        }).addTo(map);
+        tiles.on('tileerror', () => {
+          if (!disposed) setMapError(true);
+        });
+        const fence = L.circle([boundary.latitude, boundary.longitude], {
+          radius: boundary.radiusMeters,
+          color: '#2563eb',
+          fillOpacity: 0.08,
+        }).addTo(map);
+        const bounds = fence.getBounds();
+        for (const location of locations) {
+          if (location.latitude === null || location.longitude === null) continue;
+          // These are check-in punch coordinates, not a current tracking feed.
+          const label = document.createElement('span');
+          label.textContent =
+            location.fullLegalName + ' | Session start: ' + timestamp(location.checkInTimeUtc);
+          L.circleMarker([location.latitude, location.longitude], {
+            radius: 6,
+            color: '#a16207',
+            fillOpacity: 0.8,
+          })
+            .bindPopup(label)
+            .addTo(map);
+          bounds.extend([location.latitude, location.longitude]);
+        }
+        map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17 });
+        observer = new ResizeObserver(() => map?.invalidateSize());
+        observer.observe(container.current);
+      })
+      .catch(() => {
+        if (!disposed) setMapError(true);
+      });
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      map?.remove();
+    };
+  }, [boundary, locations]);
+
+  return (
+    <div>
+      <div
+        ref={container}
+        aria-label="Configured boundary and recorded check-in coordinates"
+        style={{ height: 360, width: '100%', minWidth: 0, isolation: 'isolate' }}
+      />
+      {mapError && (
+        <p role="status">Map imagery unavailable. Recorded coordinates remain listed below.</p>
+      )}
+    </div>
+  );
+}
 
 export function SiteDetailPage() {
   const { siteId } = useParams<{ siteId: string }>();
-  const navigate = useNavigate();
   const access = useHrAccess();
-
-  // Queries
-  const siteQuery = useHrQuery(`sites/${siteId}`, siteSchema, ['hr.sites.read']);
-  const geofenceQuery = useAttendanceQuery(
-    `/hr/sites/${siteId}/geofences`,
-    geofenceConfiguration,
-    true,
+  if (!access.ready || !access.can('hr.sites.read')) return <Denied />;
+  const parsedId = z.uuid().safeParse(siteId);
+  if (!parsedId.success) return <p role="alert">Invalid site identifier.</p>;
+  return (
+    <SiteEvidence
+      key={JSON.stringify([parsedId.data, access.subject, access.user])}
+      siteId={parsedId.data}
+    />
   );
-  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
-    'hr.employees.read',
-  ]);
+}
 
-  // Map state
-  const [selectedWorkerNumber, setSelectedWorkerNumber] = useState<number | null>(null);
-  const [searchWorker, setSearchWorker] = useState<string>('');
-  const [workerFilter, setWorkerFilter] = useState<'all' | 'inside' | 'perimeter'>('all');
+function SiteEvidence({ siteId }: { siteId: string }) {
+  const access = useHrAccess();
+  const allowed = access.can('hr.sites.read');
+  const siteQuery = useHrQuery(
+    'sites/' + siteId,
+    siteSchema.refine((site) => site.id.toLowerCase() === siteId.toLowerCase()),
+    ['hr.sites.read'],
+    allowed,
+  );
+  const detailsQuery = useHrQuery(
+    'sites/' + siteId + '/operational-details',
+    operationalDetails.refine((details) => details.siteId.toLowerCase() === siteId.toLowerCase()),
+    ['hr.sites.read'],
+    allowed,
+  );
+  const geofenceQuery = useAttendanceQuery(
+    '/hr/sites/' + siteId + '/geofences',
+    geofenceConfiguration.refine(
+      (configuration) =>
+        configuration.siteId.toLowerCase() === siteId.toLowerCase() &&
+        (configuration.status === 'configured'
+          ? configuration.boundary !== null &&
+            configuration.boundary.siteId.toLowerCase() === siteId.toLowerCase() &&
+            configuration.boundary.effectiveFrom <= configuration.asOfDate
+          : configuration.boundary === null),
+    ),
+    allowed,
+  );
+  const [search, setSearch] = useState('');
+  const fetching = siteQuery.isFetching || detailsQuery.isFetching || geofenceQuery.isFetching;
+  function refresh() {
+    if (!access.can('hr.sites.read') || fetching) return;
+    void siteQuery.refetch();
+    void detailsQuery.refetch();
+    void geofenceQuery.refetch();
+  }
+  const refreshButton = (
+    <Button
+      variant="secondary"
+      onClick={refresh}
+      disabled={fetching}
+      title="Refresh all site records"
+    >
+      <RefreshCw size={15} />
+      <span>{fetching ? 'Refreshing...' : 'Refresh'}</span>
+    </Button>
+  );
+  if (!allowed) return <Denied />;
+  if (siteQuery.isError)
+    return (
+      <section role="alert">
+        <p>Site information unavailable. Previously loaded evidence is hidden.</p>
+        {refreshButton}
+      </section>
+    );
+  if (siteQuery.isPending || !siteQuery.data)
+    return <p role="status">Loading site information...</p>;
 
   const site = siteQuery.data;
-  const siteCode = site?.code ?? '';
-  const preset: SiteConfig = (siteCode && SITE_DEFAULTS[siteCode]) || FALLBACK_SITE_CONFIG;
-
-  // Effective Geofence coordinates & radius
-  const latitude = geofenceQuery.data?.boundary?.latitude ?? preset.lat;
-  const longitude = geofenceQuery.data?.boundary?.longitude ?? preset.lon;
-  const radiusMeters = geofenceQuery.data?.boundary?.radiusMeters ?? preset.radius;
-  const accuracyMeters = geofenceQuery.data?.boundary?.maximumAccuracyMeters ?? preset.accuracy;
-
-  // Real Supervisor Matching
-  const allEmployees = employeesQuery.data?.items ?? [];
-  const matchedSupervisor = useMemo(() => {
-    if (site?.supervisorEmployeeId) {
-      const found = allEmployees.find((e) => e.id === site.supervisorEmployeeId);
-      if (found) return found;
-    }
-    return null;
-  }, [site?.supervisorEmployeeId, allEmployees]);
-
-  const supervisorName = matchedSupervisor?.name ?? preset.supervisorName;
-  const supervisorPhone = matchedSupervisor?.phone ?? preset.supervisorPhone;
-  const supervisorEmail = matchedSupervisor?.email ?? preset.supervisorEmail;
-  const supervisorRole = preset.supervisorRole;
-
-  // Active workforce list
-  const workers = useMemo(() => {
-    return preset.defaultWorkers.map((w) => {
-      // If we find matching employee in database, use live legal name
-      const live = allEmployees.find((e) => e.employeeNumber === w.number);
-      return {
-        ...w,
-        name: live?.name ?? w.name,
-        phone: live?.phone ?? w.phone,
-        email: live?.email ?? w.email,
-      };
-    });
-  }, [preset.defaultWorkers, allEmployees]);
-
-  // Filtered workers
-  const filteredWorkers = useMemo(() => {
-    return workers.filter((w) => {
-      const matchSearch =
-        w.name.toLowerCase().includes(searchWorker.toLowerCase()) ||
-        w.role.toLowerCase().includes(searchWorker.toLowerCase()) ||
-        w.phone.includes(searchWorker);
-
-      if (!matchSearch) return false;
-      if (workerFilter === 'inside') return w.distanceMeters <= radiusMeters * 0.85;
-      if (workerFilter === 'perimeter') return w.distanceMeters > radiusMeters * 0.85;
-      return true;
-    });
-  }, [workers, searchWorker, workerFilter, radiusMeters]);
-
-  const locateWorker = (number: number) => {
-    setSelectedWorkerNumber(number);
-  };
-
-  if (!access.can('hr.sites.read')) return <Denied />;
+  const details = detailsQuery.isError || detailsQuery.isPending ? undefined : detailsQuery.data;
+  const configuration =
+    geofenceQuery.isError || geofenceQuery.isPending ? undefined : geofenceQuery.data;
+  const boundary = configuration?.boundary;
+  const supervisor = details?.supervisor;
+  const matchingSupervisor =
+    supervisor && supervisor.supervisorId.toLowerCase() === site.supervisorEmployeeId?.toLowerCase()
+      ? supervisor
+      : null;
+  const records = details?.assignedWorkers ?? [];
+  const sessions = details?.activeWorkersOnDuty ?? [];
+  const term = search.trim().toLowerCase();
+  const matches = (worker: {
+    fullLegalName: string;
+    employeeNumber: number;
+    designationName: string;
+  }) =>
+    [worker.fullLegalName, String(worker.employeeNumber), worker.designationName].some((value) =>
+      value.toLowerCase().includes(term),
+    );
+  const filteredRecords = records.filter(matches);
+  const filteredSessions = sessions.filter(matches);
 
   return (
-    <div className="site-detail-container">
-      {/* 1. Header & Navigation */}
-      <div className="site-detail-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button
-            type="button"
-            className="site-back-btn"
-            onClick={() => navigate('/hr/sites')}
-            title="Return to sites list"
-          >
+    <div className="site-detail-container" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+      <header className="site-detail-header">
+        <div style={{ minWidth: 0 }}>
+          <Link to="/hr/sites" className="site-back-btn">
             <ArrowLeft size={16} />
-            <span>Sites List</span>
-          </button>
-
-          <div className="site-title-area">
-            <div className="site-title-row">
-              <h1>{site?.name ?? 'Loading Worksite...'}</h1>
-              <span className="site-code-badge">{site?.code ?? siteId?.slice(0, 8)}</span>
-              <span
-                className={`badge ${site?.isActive !== false ? 'badge--positive' : 'badge--neutral'}`}
-              >
-                {site?.isActive !== false ? 'Operational Worksite' : 'Inactive'}
-              </span>
-            </div>
-
-            <div className="site-meta-badges">
-              <span className="site-meta-item">
-                <Building2 size={14} />
-                Client: {site?.clientName ?? 'Enterprise Project'}
-              </span>
-              <span>•</span>
-              <span className="site-meta-item">
-                <MapPin size={14} />
-                {site?.cityName ?? site?.address ?? 'Pakistan'}
-              </span>
-              <span>•</span>
-              <span className="site-meta-item">
-                <Calendar size={14} />
-                Started: {site?.startsOn ?? '2026-01-01'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Button
-            variant="secondary"
-            onClick={() => void siteQuery.refetch()}
-            title="Refresh site information"
-          >
-            <RefreshCw size={15} />
-            <span>Sync Live Data</span>
-          </Button>
-
-          <Button
-            onClick={() => navigate(`/hr/attendance/sites/${siteId}/geofences`)}
-            title="Inspect geofence configuration"
-          >
-            <ShieldCheck size={16} />
-            <span>Manage Geofence</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* 2. Top Metric Cards */}
-      <div className="site-metrics-grid">
-        <div className="site-metric-card">
-          <div className="site-metric-icon-box blue">
-            <Users size={16} />
-          </div>
-          <div className="site-metric-content">
-            <span className="site-metric-label">Deployed Workforce</span>
-            <span className="site-metric-value">{workers.length} Personnel</span>
-            <span className="site-metric-subtext">Active Site Deployment Roster</span>
-          </div>
-        </div>
-
-        <div className="site-metric-card">
-          <div className="site-metric-icon-box green">
-            <UserCheck size={16} />
-          </div>
-          <div className="site-metric-content">
-            <span className="site-metric-label">Checked-In On-Site</span>
-            <span className="site-metric-value">
-              {workers.filter((w) => w.isInside).length} / {workers.length}
-            </span>
-            <span className="site-metric-subtext" style={{ color: '#16a34a', fontWeight: 650 }}>
-              100% Inside Active Geofence
+            Sites
+          </Link>
+          <div className="site-title-row">
+            <h1 style={{ letterSpacing: 0 }}>{site.name}</h1>
+            <span className="site-code-badge">{site.code}</span>
+            <span className={'badge ' + (site.isActive ? 'badge--positive' : 'badge--neutral')}>
+              {site.isActive ? 'Active site' : 'Inactive site'}
             </span>
           </div>
         </div>
-
-        <div className="site-metric-card">
-          <div className="site-metric-icon-box amber">
-            <Radio size={16} />
-          </div>
-          <div className="site-metric-content">
-            <span className="site-metric-label">Geofence Radius</span>
-            <span className="site-metric-value">{radiusMeters} Meters</span>
-            <span className="site-metric-subtext">GPS Accuracy: ±{accuracyMeters}m</span>
-          </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          {refreshButton}
+          <Link to={'/hr/attendance/sites/' + siteId + '/geofences'}>
+            <ShieldCheck size={15} /> Geofence
+          </Link>
         </div>
+      </header>
 
-        <div className="site-metric-card">
-          <div className="site-metric-icon-box purple">
-            <Clock size={16} />
-          </div>
-          <div className="site-metric-content">
-            <span className="site-metric-label">Active Shift</span>
-            <span className="site-metric-value" style={{ fontSize: '18px' }}>
-              {preset.shiftName.split(' ')[0]} Shift
-            </span>
-            <span className="site-metric-subtext">{preset.shiftTime}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Main Two-Column Layout (Left: Supervisor & Shift | Right: Interactive Geofence Map) */}
-      <div className="site-content-layout">
-        {/* Left Column: Supervisor & Active Shifts */}
-        <div className="site-sidebar-column">
-          {/* Site Supervisor Card */}
-          <div className="site-panel-card">
-            <div className="site-panel-header">
-              <span className="site-panel-title">
-                <User size={16} color="#2563eb" />
-                Worksite Supervisor In-Charge
-              </span>
-              <span className="supervisor-status-pill">
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: '#10b981',
-                  }}
-                />
-                On Duty
-              </span>
+      <section aria-label="Site information">
+        <dl
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+            gap: 12,
+            margin: 0,
+          }}
+        >
+          {[
+            ['Client', site.clientName],
+            ['Address', site.address],
+            ['City', site.cityName],
+            ['Starts on', site.startsOn],
+            ['Ends on', site.endsOn],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd style={{ margin: 0 }}>{value || 'Not recorded'}</dd>
             </div>
+          ))}
+        </dl>
+        {siteQuery.dataUpdatedAt > 0 && <p>Site retrieved: {timestamp(siteQuery.dataUpdatedAt)}</p>}
+      </section>
 
-            <div className="site-supervisor-body">
-              <div className="supervisor-profile-row">
-                <div className="supervisor-avatar">
-                  {supervisorName
-                    .split(' ')
-                    .filter((p) => !p.startsWith('Engr.'))
-                    .map((p) => p[0])
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase() || 'SV'}
-                </div>
-                <div className="supervisor-names">
-                  <span className="supervisor-name">{supervisorName}</span>
-                  <span className="supervisor-role">{supervisorRole}</span>
-                </div>
-              </div>
-
-              <div className="supervisor-details-list">
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <Phone size={13} /> Contact Phone:
-                  </span>
-                  <a
-                    href={`tel:${supervisorPhone}`}
-                    className="supervisor-detail-val"
-                    style={{ color: '#2563eb', textDecoration: 'none' }}
-                  >
-                    {supervisorPhone}
-                  </a>
-                </div>
-
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <Mail size={13} /> Official Email:
-                  </span>
-                  <span className="supervisor-detail-val">{supervisorEmail}</span>
-                </div>
-
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <MapPin size={13} /> Site Presence:
-                  </span>
-                  <span className="supervisor-detail-val" style={{ color: '#16a34a' }}>
-                    Inside Site Centroid (25m)
-                  </span>
-                </div>
-
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <ShieldCheck size={13} /> Verification:
-                  </span>
-                  <span className="supervisor-detail-val">Biometric Enrolled ✓</span>
-                </div>
-              </div>
-
-              {matchedSupervisor?.id && (
-                <Link
-                  to={`/hr/employees/${matchedSupervisor.id}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    padding: '9px 14px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 650,
-                    color: '#2563eb',
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    textDecoration: 'none',
-                    textAlign: 'center',
-                  }}
-                >
-                  <span>View Full Supervisor Dossier</span>
-                  <ArrowLeft size={14} style={{ transform: 'rotate(180deg)' }} />
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Active Shift Card */}
-          <div className="site-panel-card">
-            <div className="site-panel-header">
-              <span className="site-panel-title">
-                <Clock size={16} color="#16a34a" />
-                Active Shift & Working Schedule
-              </span>
-              <span className="badge badge--positive">Active</span>
-            </div>
-
-            <div className="site-shift-body">
-              <div className="shift-highlight-box">
-                <div className="shift-name-title">
-                  <span>{preset.shiftName}</span>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      background: '#ffffff',
-                      padding: '2px 7px',
-                      borderRadius: '4px',
-                      border: '1px solid #86efac',
-                      color: '#15803d',
-                      fontFamily: 'monospace',
-                    }}
-                  >
-                    SH-ACTIVE
-                  </span>
-                </div>
-                <div className="shift-hours-banner">{preset.shiftTime}</div>
-                <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
-                  Standard Daily Work Duration: 8h 00m ({preset.breakTime})
-                </span>
-              </div>
-
-              <div className="supervisor-details-list">
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <Calendar size={13} /> Working Days:
-                  </span>
-                  <span className="supervisor-detail-val">{preset.weekdays}</span>
-                </div>
-
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <Clock size={13} /> Punch Grace Period:
-                  </span>
-                  <span className="supervisor-detail-val">15 Minutes Allowed</span>
-                </div>
-
-                <div className="supervisor-detail-row">
-                  <span className="supervisor-detail-label">
-                    <ShieldCheck size={13} /> Overtime Policy:
-                  </span>
-                  <span className="supervisor-detail-val">Field Overtime Tier-1 (1.5x)</span>
-                </div>
-              </div>
-
-              <Link
-                to={`/hr/attendance/sites/${siteId}/rosters`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: 650,
-                  color: '#166534',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  textDecoration: 'none',
-                  textAlign: 'center',
-                }}
-              >
-                <span>View Full Site Roster Timeline</span>
-                <ArrowLeft size={14} style={{ transform: 'rotate(180deg)' }} />
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Real Interactive GPS Geofence & Worker Map */}
-        <SiteLeafletMap
-          siteName={site?.name ?? 'Operational Site'}
-          latitude={latitude}
-          longitude={longitude}
-          radiusMeters={radiusMeters}
-          accuracyMeters={accuracyMeters}
-          workers={workers}
-          workerFilter={workerFilter}
-          onFilterChange={setWorkerFilter}
-          selectedWorkerNumber={selectedWorkerNumber}
-          onSelectWorker={setSelectedWorkerNumber}
-        />
-      </div>
-
-      {/* 4. Deployed Workers / Staff Roster Table */}
-      <div className="site-workforce-panel">
-        <div className="site-workforce-header">
-          <div className="workforce-title-group">
-            <h3>Deployed Site Workforce ({filteredWorkers.length})</h3>
+      <section aria-labelledby="site-geofence-heading">
+        <h2 id="site-geofence-heading" style={{ fontSize: 17 }}>
+          Geofence
+        </h2>
+        {geofenceQuery.isError ? (
+          <p role="alert">Geofence unavailable. No boundary is shown.</p>
+        ) : !configuration ? (
+          <p role="status">Loading geofence...</p>
+        ) : !boundary ? (
+          <p>Geofence not configured as of {configuration.asOfDate}.</p>
+        ) : (
+          <>
             <p>
-              Real-time attendance check-ins, live distances from site centroid, and active shift
-              assignments for {site?.name}.
+              Version {boundary.versionNumber}; effective {boundary.effectiveFrom}; as of{' '}
+              {configuration.asOfDate}.
+              {!site.isActive && ' Inactive site: this boundary is not punch authorization.'}
             </p>
-          </div>
+            <p>
+              <MapPin size={14} /> Latitude {boundary.latitude}, longitude {boundary.longitude};
+              radius {boundary.radiusMeters} m; maximum GPS accuracy{' '}
+              {boundary.maximumAccuracyMeters} m.
+            </p>
+            <RecordedSiteMap
+              key={JSON.stringify([boundary, detailsQuery.dataUpdatedAt, detailsQuery.isError])}
+              boundary={boundary}
+              locations={sessions}
+            />
+            <p>
+              Boundary: blue. Check-in snapshots: amber. Current worker position and face
+              verification: unavailable.
+            </p>
+          </>
+        )}
+      </section>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ position: 'relative' }}>
+      <section aria-labelledby="site-workers-heading">
+        <h2 id="site-workers-heading" style={{ fontSize: 17 }}>
+          Site personnel
+        </h2>
+        {detailsQuery.isError ? (
+          <p role="alert">Site personnel unavailable. Previously loaded records are hidden.</p>
+        ) : !details ? (
+          <p role="status">Loading site personnel...</p>
+        ) : (
+          <>
+            <p>Personnel retrieved: {timestamp(detailsQuery.dataUpdatedAt)}</p>
+            <h3 style={{ fontSize: 15 }}>Assigned supervisor</h3>
+            {matchingSupervisor ? (
+              <dl>
+                <dt>Name</dt>
+                <dd>{matchingSupervisor.fullLegalName}</dd>
+                <dt>Designation</dt>
+                <dd>{matchingSupervisor.designationName || 'Not recorded'}</dd>
+                <dt>Phone</dt>
+                <dd>{matchingSupervisor.personalPhone || 'Not recorded'}</dd>
+                <dt>Email</dt>
+                <dd>{matchingSupervisor.officialEmail || 'Not recorded'}</dd>
+              </dl>
+            ) : (
+              <p>
+                {site.supervisorEmployeeId
+                  ? 'Supervisor details unavailable.'
+                  : 'No supervisor assigned.'}
+              </p>
+            )}
+            <label style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              <Search size={16} />
+              Search personnel
               <input
-                type="text"
-                className="workforce-search-input"
-                placeholder="Search staff by name or role..."
-                value={searchWorker}
-                onChange={(e) => setSearchWorker(e.target.value)}
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                style={{ maxWidth: '100%', minWidth: 0 }}
               />
-              <Search
-                size={14}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '10px',
-                  color: '#94a3b8',
-                }}
-              />
-            </div>
-          </div>
-        </div>
+            </label>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="workforce-table">
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Designation & Trade</th>
-                <th>Active Shift</th>
-                <th>Today's Punch</th>
-                <th>Geofence Position</th>
-                <th>Contact</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredWorkers.map((w) => {
-                const initials = w.name
-                  .split(' ')
-                  .filter((p) => !p.startsWith('Engr.'))
-                  .map((p) => p[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase();
+            <h3 style={{ fontSize: 15 }}>Assignment records ({records.length})</h3>
+            {records.length === 0 ? (
+              <p>No assignment records returned.</p>
+            ) : filteredRecords.length === 0 ? (
+              <p>No matching assignment records.</p>
+            ) : (
+              <div style={{ maxWidth: '100%', overflowX: 'auto' }}>
+                <table className="hr-table" style={{ minWidth: 680, width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Designation</th>
+                      <th>Department</th>
+                      <th>Effective from</th>
+                      <th>Employee status</th>
+                      <th>Phone</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRecords.map((worker, index) => (
+                      <tr key={worker.employeeId + worker.effectiveFrom + index}>
+                        <td>
+                          {worker.fullLegalName}
+                          <br />#{worker.employeeNumber}
+                        </td>
+                        <td>{worker.designationName}</td>
+                        <td>{worker.departmentName}</td>
+                        <td>{worker.effectiveFrom}</td>
+                        <td>{worker.status}</td>
+                        <td>{worker.personalPhone || 'Not recorded'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-                const isNearBoundary = w.distanceMeters > radiusMeters * 0.85;
-
-                return (
-                  <tr
-                    key={w.number}
-                    style={{
-                      background: selectedWorkerNumber === w.number ? '#f0fdf4' : undefined,
-                    }}
-                  >
-                    <td>
-                      <div className="worker-cell-name">
-                        <div className="worker-avatar-small">{initials}</div>
-                        <div>
-                          <div className="worker-name-text">{w.name}</div>
-                          <div className="worker-num-text">EMP #{w.number}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <span style={{ fontWeight: 600, color: '#0f172a' }}>{w.role}</span>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>Site Operations</div>
-                    </td>
-
-                    <td>
-                      <div style={{ fontWeight: 600, color: '#166534' }}>{preset.shiftName}</div>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>{preset.shiftTime}</div>
-                    </td>
-
-                    <td>
-                      <div style={{ fontWeight: 700, color: '#15803d' }}>
-                        ✓ {w.checkIn} Check-in
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#166534' }}>
-                        Face ID: {w.faceScore} match
-                      </div>
-                    </td>
-
-                    <td>
-                      <div>
-                        <span
-                          className={isNearBoundary ? 'badge-near-boundary' : 'badge-inside-site'}
-                        >
-                          <Target size={12} />
-                          {isNearBoundary ? 'At Boundary Gate' : 'Inside Core Perimeter'}
-                        </span>
-                        <div
-                          style={{
-                            fontSize: '11.5px',
-                            color: '#64748b',
-                            marginTop: '2px',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {w.distanceMeters}m from center
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <div style={{ fontSize: '12.5px', color: '#0f172a', fontWeight: 600 }}>
-                        {w.phone}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>{w.email}</div>
-                    </td>
-
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-locate-worker"
-                        onClick={() => locateWorker(w.number)}
-                      >
-                        <Target size={12} />
-                        Locate on Map
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            <h3 style={{ fontSize: 15 }}>Open-session check-in records ({sessions.length})</h3>
+            <p>
+              Sessions started within the API's last 24-hour window. Coordinates are from check-in,
+              not live tracking.
+            </p>
+            {sessions.length === 0 ? (
+              <p>No open-session check-in records returned.</p>
+            ) : filteredSessions.length === 0 ? (
+              <p>No matching check-in records.</p>
+            ) : (
+              <div style={{ maxWidth: '100%', overflowX: 'auto' }}>
+                <table className="hr-table" style={{ minWidth: 680, width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Session start (UTC)</th>
+                      <th>Recorded latitude, longitude</th>
+                      <th>GPS accuracy</th>
+                      <th>Map</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSessions.map((worker, index) => (
+                      <tr key={worker.employeeId + worker.checkInTimeUtc + index}>
+                        <td>
+                          {worker.fullLegalName}
+                          <br />#{worker.employeeNumber}
+                        </td>
+                        <td>{timestamp(worker.checkInTimeUtc)}</td>
+                        <td>
+                          {worker.latitude === null || worker.longitude === null
+                            ? 'Not recorded'
+                            : worker.latitude + ', ' + worker.longitude}
+                        </td>
+                        <td>
+                          {worker.accuracyMeters === null
+                            ? 'Not recorded'
+                            : worker.accuracyMeters + ' m'}
+                        </td>
+                        <td>
+                          {worker.latitude !== null && worker.longitude !== null ? (
+                            <a
+                              href={
+                                'https://www.google.com/maps/search/?api=1&query=' +
+                                worker.latitude +
+                                ',' +
+                                worker.longitude
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={
+                                'Open recorded check-in coordinates for ' + worker.fullLegalName
+                              }
+                              title="Open recorded check-in coordinates"
+                            >
+                              <ExternalLink size={16} />
+                            </a>
+                          ) : (
+                            'Unavailable'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

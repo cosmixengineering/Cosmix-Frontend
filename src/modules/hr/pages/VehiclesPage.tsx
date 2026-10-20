@@ -20,6 +20,15 @@ import { useFinanceAccess } from '../hooks/use-finance-access';
 import { useFinanceAction, useFinanceQuery } from '../hooks/use-finance-queries';
 import { queryString } from '../api/hr-finance-api';
 import { labelDate } from '../utils/messages';
+import { VehiclePolicyManagement } from '../components/vehicle-management/VehiclePolicyManagement';
+import { VehicleMonthlyManagement } from '../components/vehicle-management/VehicleMonthlyManagement';
+import { VehicleIncidentManagement } from '../components/vehicle-management/VehicleIncidentManagement';
+import { VehicleTripAttribution } from '../components/vehicle-management/VehicleTripAttribution';
+import {
+  VehicleManagementIntents,
+  useVehicleNavigation,
+} from '../components/vehicle-management/VehicleManagementShared';
+import { vehicleManagementPermissions } from '../api/vehicle-management';
 import {
   commuteDistance,
   custodyList,
@@ -27,7 +36,6 @@ import {
   fuelClaimPage,
   vehicle,
   vehicleCustody,
-  vehicleIncident,
   vehicleIncidentPage,
   vehicleList,
   vehicleService,
@@ -39,7 +47,6 @@ import {
 } from '../schemas/finance';
 
 const permissions = {
-  self: 'attendance.vehicle.self',
   manage: 'attendance.vehicle.manage',
   custody: 'attendance.vehicle.custody.manage',
   trips: 'attendance.vehicle.trips.manage',
@@ -51,15 +58,19 @@ const permissions = {
 
 export function VehiclesPage() {
   const access = useFinanceAccess();
-  const tabs = [
-    { id: 'trips', label: 'Trips' },
-    { id: 'fuel', label: 'Fuel claims' },
-    { id: 'maintenance', label: 'Maintenance' },
-    { id: 'custody', label: 'Custody' },
-    { id: 'incidents', label: 'Incidents' },
-  ];
+  return (
+    <VehicleManagementIntents key={JSON.stringify([access.subject, access.user])}>
+      <VehiclesManagementWorkspace />
+    </VehicleManagementIntents>
+  );
+}
+
+function VehiclesManagementWorkspace() {
+  const access = useFinanceAccess();
+  const navigation = useVehicleNavigation();
   const [tab, setTab] = useState('trips');
-  const canSelf = access.canSelf(permissions.self);
+  // Personal vehicle actions are mobile-only; the web composes management paths only.
+
   const canTrips = access.can(permissions.trips);
   const canFuel = access.can(permissions.fuel);
   const canMaintenance = access.can(permissions.maintenance);
@@ -67,77 +78,66 @@ export function VehiclesPage() {
   const canIncident = access.can(permissions.incident);
   const canManage = access.can(permissions.manage);
   const canCommute = access.can(permissions.commute);
+  const canPolicy = access.can(vehicleManagementPermissions.policy);
+  const tabs = [
+    ...(canTrips ? [{ id: 'trips', label: 'Trips' }] : []),
+    ...(canFuel || canCommute ? [{ id: 'fuel', label: 'Fuel claims' }] : []),
+    ...(canMaintenance ? [{ id: 'maintenance', label: 'Maintenance' }] : []),
+    ...(canCustody || canManage ? [{ id: 'custody', label: 'Custody' }] : []),
+    ...(canIncident ? [{ id: 'incidents', label: 'Incidents' }] : []),
+    ...(canFuel ? [{ id: 'monthly', label: 'Monthly adjustments' }] : []),
+    ...(canPolicy ? [{ id: 'policies', label: 'Policies' }] : []),
+  ];
+  const activeTab = tabs.some((item) => item.id === tab) ? tab : (tabs[0]?.id ?? '');
   if (
-    !canSelf &&
     !canTrips &&
     !canFuel &&
     !canMaintenance &&
     !canCustody &&
     !canIncident &&
     !canManage &&
-    !canCommute
+    !canCommute &&
+    !canPolicy
   )
     return <Denied />;
   return (
     <section aria-label="Vehicles and fuel">
       <div className="hr-page-heading">
-        <p className="hr-kicker">HR &bull; Attendance money</p>
+        <p className="hr-kicker">HR &bull; Vehicle management</p>
         <h1>Vehicles and fuel</h1>
       </div>
-      <FinanceTabs tabs={tabs} active={tab} onChange={setTab} label="Vehicle views" />
-      {tab === 'trips' && (
-        <VehicleTrips canSelf={canSelf} canManage={canTrips} canVehicles={canManage} />
+      <FinanceTabs
+        tabs={tabs}
+        active={activeTab}
+        onChange={(next) => {
+          if (next !== activeTab) navigation.navigate(() => setTab(next));
+        }}
+        label="Vehicle management views"
+      />
+      {activeTab === 'trips' && <VehicleTrips canManage={canTrips} canVehicles={canManage} />}
+      {activeTab === 'fuel' && (
+        <VehicleFuel canManage={canFuel} canCommute={canCommute} canVehicles={canManage} />
       )}
-      {tab === 'fuel' && (
-        <VehicleFuel
-          canSelf={canSelf}
-          canManage={canFuel}
-          canCommute={canCommute}
-          canVehicles={canManage}
-        />
+      {activeTab === 'maintenance' && (
+        <VehicleMaintenance canManage={canMaintenance} canVehicles={canManage} />
       )}
-      {tab === 'maintenance' && (
-        <VehicleMaintenance canSelf={canSelf} canManage={canMaintenance} canVehicles={canManage} />
+      {activeTab === 'custody' && (
+        <VehicleCustodyPanel canManage={canCustody} canVehicles={canManage} />
       )}
-      {tab === 'custody' && (
-        <VehicleCustodyPanel canSelf={canSelf} canManage={canCustody} canVehicles={canManage} />
-      )}
-      {tab === 'incidents' && <VehicleIncidents canSelf={canSelf} canManage={canIncident} />}
+      {activeTab === 'incidents' && <VehicleIncidents canManage={canIncident} />}
+      {activeTab === 'monthly' && <VehicleMonthlyManagement />}
+      {activeTab === 'policies' && <VehiclePolicyManagement />}
     </section>
   );
 }
 
-function useMyCustody(enabled: boolean) {
-  return useFinanceQuery('/me/vehicles/custody', custodyList, enabled);
-}
-
-function VehicleTrips({
-  canSelf,
-  canManage,
-  canVehicles,
-}: {
-  canSelf: boolean;
-  canManage: boolean;
-  canVehicles: boolean;
-}) {
-  const custody = useMyCustody(canSelf);
-  const [form, setForm] = useState({
-    vehicleId: '',
-    purpose: '1',
-    startedAt: '',
-    endedAt: '',
-    originLabel: '',
-    destinationLabel: '',
-    odometerStartKm: '',
-    odometerEndKm: '',
-    mapDistanceKm: '',
-    routeEvidenceReference: '',
-    workReference: '',
-  });
+function VehicleTrips({ canManage, canVehicles }: { canManage: boolean; canVehicles: boolean }) {
+  const navigation = useVehicleNavigation();
   const [page, setPage] = useState(1);
   const [state, setState] = useState('0');
   const [employeeId, setEmployeeId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
+  const [selectedTripId, setSelectedTripId] = useState('');
   const action = useFinanceAction();
 
   const trips = useFinanceQuery(
@@ -153,38 +153,8 @@ function VehicleTrips({
     canManage,
   );
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const result = await action.run(
-      '/me/vehicles/trips',
-      {
-        vehicleId: form.vehicleId,
-        purpose: Number(form.purpose),
-        startedAt: new Date(form.startedAt).toISOString(),
-        endedAt: new Date(form.endedAt).toISOString(),
-        originLabel: form.originLabel,
-        destinationLabel: form.destinationLabel,
-        odometerStartKm: Number(form.odometerStartKm),
-        odometerEndKm: Number(form.odometerEndKm),
-        mapDistanceKm: Number(form.mapDistanceKm),
-        routeEvidenceReference: form.routeEvidenceReference,
-        workReference: form.workReference,
-      },
-      'POST',
-      vehicleTrip,
-    );
-    if (result) {
-      setForm({
-        ...form,
-        originLabel: '',
-        destinationLabel: '',
-        routeEvidenceReference: '',
-        workReference: '',
-      });
-    }
-  }
-
   async function approve(tripId: string) {
+    if (navigation.retained) return;
     if (!window.confirm('Approve this trip?')) return;
     const result = await action.run(
       `/hr/vehicles/trips/${tripId}/approve`,
@@ -197,142 +167,44 @@ function VehicleTrips({
 
   return (
     <>
-      {canSelf && (
-        <section className="hr-form-section">
-          <h2>Submit a trip</h2>
-          <QueryState query={custody}>
-            <form className="hr-form-grid" onSubmit={(event) => void submit(event)}>
-              <SelectInput
-                label="Vehicle"
-                required
-                value={form.vehicleId}
-                options={[
-                  { value: '', label: 'Choose a vehicle in your custody' },
-                  ...(custody.data ?? []).map((item) => ({
-                    value: item.vehicleId,
-                    label: item.registrationNumber,
-                  })),
-                ]}
-                onChange={(event) => setForm({ ...form, vehicleId: event.target.value })}
-              />
-              <SelectInput
-                label="Purpose"
-                value={form.purpose}
-                options={journeyPurposeOptions}
-                onChange={(event) => setForm({ ...form, purpose: event.target.value })}
-              />
-              <TextInput
-                label="Started at"
-                required
-                type="datetime-local"
-                value={form.startedAt}
-                onChange={(event) => setForm({ ...form, startedAt: event.target.value })}
-              />
-              <TextInput
-                label="Ended at"
-                required
-                type="datetime-local"
-                value={form.endedAt}
-                onChange={(event) => setForm({ ...form, endedAt: event.target.value })}
-              />
-              <TextInput
-                label="Origin"
-                required
-                maxLength={200}
-                value={form.originLabel}
-                onChange={(event) => setForm({ ...form, originLabel: event.target.value })}
-              />
-              <TextInput
-                label="Destination"
-                required
-                maxLength={200}
-                value={form.destinationLabel}
-                onChange={(event) => setForm({ ...form, destinationLabel: event.target.value })}
-              />
-              <TextInput
-                label="Odometer start (km)"
-                required
-                type="number"
-                min={0}
-                step="0.1"
-                value={form.odometerStartKm}
-                onChange={(event) => setForm({ ...form, odometerStartKm: event.target.value })}
-              />
-              <TextInput
-                label="Odometer end (km)"
-                required
-                type="number"
-                min={0}
-                step="0.1"
-                value={form.odometerEndKm}
-                onChange={(event) => setForm({ ...form, odometerEndKm: event.target.value })}
-              />
-              <TextInput
-                label="Map distance (km)"
-                required
-                type="number"
-                min={0}
-                max={50_000}
-                step="0.1"
-                value={form.mapDistanceKm}
-                onChange={(event) => setForm({ ...form, mapDistanceKm: event.target.value })}
-              />
-              <TextInput
-                label="Route evidence reference"
-                required
-                maxLength={500}
-                value={form.routeEvidenceReference}
-                onChange={(event) =>
-                  setForm({ ...form, routeEvidenceReference: event.target.value })
-                }
-              />
-              <TextInput
-                label="Work reference"
-                required
-                maxLength={150}
-                value={form.workReference}
-                onChange={(event) => setForm({ ...form, workReference: event.target.value })}
-              />
-              <div className="hr-actions wide">
-                <Button type="submit" disabled={action.pending}>
-                  Submit trip
-                </Button>
-              </div>
-            </form>
-          </QueryState>
-          <ActionMessage action={action} />
-        </section>
-      )}
-
       {canManage && (
         <section className="hr-form-section">
           <h2>Trip queue</h2>
           <div className="hr-toolbar">
             <SelectInput
               label="State"
+              disabled={navigation.pending}
               value={state}
               options={approvalStateOptions}
               onChange={(event) => {
-                setState(event.target.value);
-                setPage(1);
+                navigation.navigate(() => {
+                  setState(event.target.value);
+                  setPage(1);
+                });
               }}
             />
             <TextInput
               label="Employee id"
+              disabled={navigation.pending}
               value={employeeId}
               placeholder="All employees"
               onChange={(event) => {
-                setEmployeeId(event.target.value);
-                setPage(1);
+                navigation.navigate(() => {
+                  setEmployeeId(event.target.value);
+                  setPage(1);
+                });
               }}
             />
             <TextInput
               label="Vehicle id"
+              disabled={navigation.pending}
               value={vehicleId}
               placeholder="All vehicles"
               onChange={(event) => {
-                setVehicleId(event.target.value);
-                setPage(1);
+                navigation.navigate(() => {
+                  setVehicleId(event.target.value);
+                  setPage(1);
+                });
               }}
             />
           </div>
@@ -349,8 +221,22 @@ function VehicleTrips({
                     <FinanceStatus value={trip.approvalState} />
                   </h3>
                   <div className="hr-actions">
+                    <Button
+                      variant="secondary"
+                      disabled={navigation.pending}
+                      onClick={() => {
+                        if (selectedTripId !== trip.id)
+                          navigation.navigate(() => setSelectedTripId(trip.id));
+                      }}
+                    >
+                      Dated attribution and history
+                    </Button>
                     {trip.approvalState === 'Pending' && (
-                      <Button variant="success" onClick={() => void approve(trip.id)}>
+                      <Button
+                        variant="success"
+                        disabled={navigation.retained}
+                        onClick={() => void approve(trip.id)}
+                      >
                         Approve
                       </Button>
                     )}
@@ -375,13 +261,24 @@ function VehicleTrips({
                 />
               </article>
             ))}
+            {trips.data?.items
+              .filter((item) => item.id === selectedTripId)
+              .map((item) => (
+                <VehicleTripAttribution
+                  key={item.id}
+                  trip={item}
+                  onChanged={() => void trips.refetch()}
+                />
+              ))}
             {trips.data && (
               <HasMorePager
                 page={page}
                 hasMore={trips.data.hasMore}
-                busy={trips.isFetching}
-                onPrevious={() => setPage((value) => Math.max(1, value - 1))}
-                onNext={() => setPage((value) => value + 1)}
+                busy={trips.isFetching || navigation.pending}
+                onPrevious={() =>
+                  navigation.navigate(() => setPage((value) => Math.max(1, value - 1)))
+                }
+                onNext={() => navigation.navigate(() => setPage((value) => value + 1))}
               />
             )}
           </QueryState>
@@ -398,23 +295,16 @@ function VehicleTrips({
 }
 
 function VehicleFuel({
-  canSelf,
   canManage,
   canCommute,
   canVehicles,
 }: {
-  canSelf: boolean;
   canManage: boolean;
   canCommute: boolean;
   canVehicles: boolean;
 }) {
-  const custody = useMyCustody(canSelf);
   const vehicles = useFinanceQuery('/hr/vehicles', vehicleList, canVehicles);
-  const [fuelForm, setFuelForm] = useState({
-    vehicleTripId: '',
-    currency: 'PKR',
-    receiptReference: '',
-  });
+
   const [commuteForm, setCommuteForm] = useState({
     employeeId: '',
     effectiveFrom: '',
@@ -439,21 +329,6 @@ function VehicleFuel({
     fuelClaimPage,
     canManage,
   );
-
-  async function submitFuel(event: FormEvent) {
-    event.preventDefault();
-    const result = await action.run(
-      '/me/vehicles/fuel-claims',
-      {
-        vehicleTripId: fuelForm.vehicleTripId,
-        currency: fuelForm.currency.trim().toUpperCase(),
-        receiptReference: fuelForm.receiptReference || null,
-      },
-      'POST',
-      fuelClaim,
-    );
-    if (result) setFuelForm({ ...fuelForm, vehicleTripId: '', receiptReference: '' });
-  }
 
   async function approveClaim(claimId: string) {
     if (!window.confirm('Approve this fuel claim for payroll settlement?')) return;
@@ -493,49 +368,6 @@ function VehicleFuel({
 
   return (
     <>
-      {canSelf && (
-        <section className="hr-form-section">
-          <h2>Submit a fuel claim</h2>
-          <p className="muted">
-            Enter the id of the approved trip this claim belongs to. A fuel claim needs an approved
-            trip, and only one claim can exist per trip.
-          </p>
-          <QueryState query={custody}>
-            <form className="hr-form-grid" onSubmit={(event) => void submitFuel(event)}>
-              <TextInput
-                label="Approved trip id"
-                required
-                value={fuelForm.vehicleTripId}
-                onChange={(event) =>
-                  setFuelForm({ ...fuelForm, vehicleTripId: event.target.value })
-                }
-              />
-              <TextInput
-                label="Currency"
-                required
-                maxLength={3}
-                value={fuelForm.currency}
-                onChange={(event) => setFuelForm({ ...fuelForm, currency: event.target.value })}
-              />
-              <TextInput
-                label="Receipt reference"
-                maxLength={500}
-                value={fuelForm.receiptReference}
-                onChange={(event) =>
-                  setFuelForm({ ...fuelForm, receiptReference: event.target.value })
-                }
-              />
-              <div className="hr-actions wide">
-                <Button type="submit" disabled={action.pending || !fuelForm.vehicleTripId.trim()}>
-                  Submit fuel claim
-                </Button>
-              </div>
-            </form>
-          </QueryState>
-          <ActionMessage action={action} />
-        </section>
-      )}
-
       {canCommute && (
         <section className="hr-form-section">
           <h2>Baseline commute distance</h2>
@@ -699,26 +531,12 @@ function VehicleFuel({
 }
 
 function VehicleMaintenance({
-  canSelf,
   canManage,
   canVehicles,
 }: {
-  canSelf: boolean;
   canManage: boolean;
   canVehicles: boolean;
 }) {
-  const custody = useMyCustody(canSelf);
-  const [form, setForm] = useState({
-    vehicleId: '',
-    serviceKind: '1',
-    serviceDate: new Date().toISOString().slice(0, 10),
-    odometerKm: '',
-    approvedOutstationKm: '',
-    authorizedWorkshopReference: '',
-    evidenceReference: '',
-    claimedAmount: '',
-    currency: 'PKR',
-  });
   const [page, setPage] = useState(1);
   const [state, setState] = useState('0');
   const [employeeId, setEmployeeId] = useState('');
@@ -738,34 +556,6 @@ function VehicleMaintenance({
     canManage,
   );
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const result = await action.run(
-      '/me/vehicles/maintenance',
-      {
-        vehicleId: form.vehicleId,
-        serviceKind: Number(form.serviceKind),
-        serviceDate: form.serviceDate,
-        odometerKm: Number(form.odometerKm),
-        approvedOutstationKm: Number(form.approvedOutstationKm),
-        authorizedWorkshopReference: form.authorizedWorkshopReference,
-        evidenceReference: form.evidenceReference,
-        claimedAmount: Number(form.claimedAmount),
-        currency: form.currency.trim().toUpperCase(),
-      },
-      'POST',
-      vehicleService,
-    );
-    if (result)
-      setForm({
-        ...form,
-        odometerKm: '',
-        authorizedWorkshopReference: '',
-        evidenceReference: '',
-        claimedAmount: '',
-      });
-  }
-
   async function approve(recordId: string) {
     if (!window.confirm('Approve this maintenance reimbursement?')) return;
     const result = await action.run(
@@ -779,99 +569,6 @@ function VehicleMaintenance({
 
   return (
     <>
-      {canSelf && (
-        <section className="hr-form-section">
-          <h2>Submit a maintenance milestone</h2>
-          <QueryState query={custody}>
-            <form className="hr-form-grid" onSubmit={(event) => void submit(event)}>
-              <SelectInput
-                label="Vehicle"
-                required
-                value={form.vehicleId}
-                options={[
-                  { value: '', label: 'Choose a vehicle in your custody' },
-                  ...(custody.data ?? []).map((item: VehicleCustody) => ({
-                    value: item.vehicleId,
-                    label: item.registrationNumber,
-                  })),
-                ]}
-                onChange={(event) => setForm({ ...form, vehicleId: event.target.value })}
-              />
-              <SelectInput
-                label="Service kind"
-                value={form.serviceKind}
-                options={serviceKindOptions}
-                onChange={(event) => setForm({ ...form, serviceKind: event.target.value })}
-              />
-              <TextInput
-                label="Service date"
-                required
-                type="date"
-                value={form.serviceDate}
-                onChange={(event) => setForm({ ...form, serviceDate: event.target.value })}
-              />
-              <TextInput
-                label="Odometer (km)"
-                required
-                type="number"
-                min={0}
-                step="0.1"
-                value={form.odometerKm}
-                onChange={(event) => setForm({ ...form, odometerKm: event.target.value })}
-              />
-              <TextInput
-                label="Approved outstation (km)"
-                required
-                type="number"
-                min={0}
-                max={50_000}
-                step="0.1"
-                value={form.approvedOutstationKm}
-                onChange={(event) => setForm({ ...form, approvedOutstationKm: event.target.value })}
-              />
-              <TextInput
-                label="Authorized workshop reference"
-                required
-                maxLength={200}
-                value={form.authorizedWorkshopReference}
-                onChange={(event) =>
-                  setForm({ ...form, authorizedWorkshopReference: event.target.value })
-                }
-              />
-              <TextInput
-                label="Evidence reference"
-                required
-                maxLength={500}
-                value={form.evidenceReference}
-                onChange={(event) => setForm({ ...form, evidenceReference: event.target.value })}
-              />
-              <TextInput
-                label="Claimed amount"
-                required
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.claimedAmount}
-                onChange={(event) => setForm({ ...form, claimedAmount: event.target.value })}
-              />
-              <TextInput
-                label="Currency"
-                required
-                maxLength={3}
-                value={form.currency}
-                onChange={(event) => setForm({ ...form, currency: event.target.value })}
-              />
-              <div className="hr-actions wide">
-                <Button type="submit" disabled={action.pending}>
-                  Submit maintenance
-                </Button>
-              </div>
-            </form>
-          </QueryState>
-          <ActionMessage action={action} />
-        </section>
-      )}
-
       {canManage && (
         <section className="hr-form-section">
           <h2>Maintenance queue</h2>
@@ -959,15 +656,12 @@ function VehicleMaintenance({
 }
 
 function VehicleCustodyPanel({
-  canSelf,
   canManage,
   canVehicles,
 }: {
-  canSelf: boolean;
   canManage: boolean;
   canVehicles: boolean;
 }) {
-  const custody = useMyCustody(canSelf);
   const vehicles = useFinanceQuery('/hr/vehicles', vehicleList, canVehicles);
   const [vehicleId, setVehicleId] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('');
@@ -1063,37 +757,11 @@ function VehicleCustodyPanel({
       setReturning(null);
       setReturnForm({ returnedAt: '', returnOdometerKm: '', returnConditionReference: '' });
       void history.refetch();
-      void custody.refetch();
     }
   }
 
   return (
     <>
-      {canSelf && (
-        <section className="hr-form-section">
-          <h2>My vehicle custody</h2>
-          <QueryState query={custody}>
-            {!custody.data?.length && <FinanceNotice>No vehicle custody history.</FinanceNotice>}
-            {custody.data?.map((item) => (
-              <RecordView
-                key={item.id}
-                value={{
-                  custodyReference: item.id,
-                  registrationNumber: item.registrationNumber,
-                  issuedAt: labelDate(item.issuedAt),
-                  issueOdometerKm: item.issueOdometerKm,
-                  issuedCondition: item.issueConditionReference,
-                  returnedAt: labelDate(item.returnedAt),
-                  returnOdometerKm: item.returnOdometerKm,
-                  returnCondition: item.returnConditionReference,
-                  active: item.isActive,
-                }}
-              />
-            ))}
-          </QueryState>
-        </section>
-      )}
-
       {canManage && (
         <section className="hr-form-section">
           <h2>Custody history</h2>
@@ -1327,21 +995,12 @@ function VehicleCustodyPanel({
   );
 }
 
-function VehicleIncidents({ canSelf, canManage }: { canSelf: boolean; canManage: boolean }) {
-  const custody = useMyCustody(canSelf);
-  const [form, setForm] = useState({
-    vehicleCustodyId: '',
-    occurredAt: '',
-    incidentEvidenceReference: '',
-    thirdPartyDetailsReference: '',
-    insuranceClaimReference: '',
-    proposedEmployeeLiability: '',
-    currency: 'PKR',
-  });
+function VehicleIncidents({ canManage }: { canManage: boolean }) {
+  const navigation = useVehicleNavigation();
   const [page, setPage] = useState(1);
   const [state, setState] = useState('');
   const [custodyId, setCustodyId] = useState('');
-  const action = useFinanceAction();
+  const [selectedIncidentId, setSelectedIncidentId] = useState('');
 
   const incidents = useFinanceQuery(
     '/hr/vehicles/incidents' +
@@ -1355,146 +1014,37 @@ function VehicleIncidents({ canSelf, canManage }: { canSelf: boolean; canManage:
     canManage,
   );
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const result = await action.run(
-      '/me/vehicles/incidents',
-      {
-        vehicleCustodyId: form.vehicleCustodyId,
-        occurredAt: new Date(form.occurredAt).toISOString(),
-        incidentEvidenceReference: form.incidentEvidenceReference,
-        thirdPartyDetailsReference: form.thirdPartyDetailsReference || null,
-        insuranceClaimReference: form.insuranceClaimReference || null,
-        proposedEmployeeLiability: form.proposedEmployeeLiability
-          ? Number(form.proposedEmployeeLiability)
-          : null,
-        currency: form.currency.trim().toUpperCase() || null,
-      },
-      'POST',
-      vehicleIncident,
-    );
-    if (result)
-      setForm({
-        ...form,
-        vehicleCustodyId: '',
-        incidentEvidenceReference: '',
-        thirdPartyDetailsReference: '',
-        insuranceClaimReference: '',
-        proposedEmployeeLiability: '',
-      });
-  }
-
   return (
     <>
-      {canSelf && (
-        <section className="hr-form-section">
-          <h2>Report an incident</h2>
-          <p className="muted">
-            Incidents are recorded for review. The backend does not expose an incident decision
-            endpoint, so reports stay read-only after submission.
-          </p>
-          <QueryState query={custody}>
-            <form className="hr-form-grid" onSubmit={(event) => void submit(event)}>
-              <SelectInput
-                label="Custody record"
-                required
-                value={form.vehicleCustodyId}
-                options={[
-                  { value: '', label: 'Choose an active custody record' },
-                  ...(custody.data ?? [])
-                    .filter((item) => item.isActive)
-                    .map((item) => ({
-                      value: item.id,
-                      label: `${item.registrationNumber} issued ${labelDate(item.issuedAt)}`,
-                    })),
-                ]}
-                onChange={(event) => setForm({ ...form, vehicleCustodyId: event.target.value })}
-              />
-              <TextInput
-                label="Occurred at"
-                required
-                type="datetime-local"
-                value={form.occurredAt}
-                onChange={(event) => setForm({ ...form, occurredAt: event.target.value })}
-              />
-              <TextInput
-                label="Incident evidence reference"
-                required
-                maxLength={500}
-                value={form.incidentEvidenceReference}
-                onChange={(event) =>
-                  setForm({ ...form, incidentEvidenceReference: event.target.value })
-                }
-              />
-              <TextInput
-                label="Third party details reference"
-                maxLength={500}
-                value={form.thirdPartyDetailsReference}
-                onChange={(event) =>
-                  setForm({ ...form, thirdPartyDetailsReference: event.target.value })
-                }
-              />
-              <TextInput
-                label="Insurance claim reference"
-                maxLength={200}
-                value={form.insuranceClaimReference}
-                onChange={(event) =>
-                  setForm({ ...form, insuranceClaimReference: event.target.value })
-                }
-              />
-              <TextInput
-                label="Proposed employee liability"
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.proposedEmployeeLiability}
-                onChange={(event) =>
-                  setForm({ ...form, proposedEmployeeLiability: event.target.value })
-                }
-              />
-              <TextInput
-                label="Currency"
-                maxLength={3}
-                value={form.currency}
-                onChange={(event) => setForm({ ...form, currency: event.target.value })}
-              />
-              <div className="hr-actions wide">
-                <Button type="submit" disabled={action.pending}>
-                  Report incident
-                </Button>
-              </div>
-            </form>
-          </QueryState>
-          <ActionMessage action={action} />
-        </section>
-      )}
-
       {canManage && (
         <section className="hr-form-section">
           <h2>Incident reports</h2>
           <div className="hr-toolbar">
             <SelectInput
               label="State"
+              disabled={navigation.pending}
               value={state}
               options={approvalStateOptions}
               onChange={(event) => {
-                setState(event.target.value);
-                setPage(1);
+                navigation.navigate(() => {
+                  setState(event.target.value);
+                  setPage(1);
+                });
               }}
             />
             <TextInput
               label="Custody id"
+              disabled={navigation.pending}
               value={custodyId}
               placeholder="All custody records"
               onChange={(event) => {
-                setCustodyId(event.target.value);
-                setPage(1);
+                navigation.navigate(() => {
+                  setCustodyId(event.target.value);
+                  setPage(1);
+                });
               }}
             />
           </div>
-          <p className="muted">
-            Incidents have no decide endpoint, so this queue is read-only evidence for review.
-          </p>
           <QueryState query={incidents}>
             {!incidents.data?.items.length && (
               <FinanceNotice>No incident reports match this filter.</FinanceNotice>
@@ -1506,6 +1056,16 @@ function VehicleIncidents({ canSelf, canManage }: { canSelf: boolean; canManage:
                     {incident.vehicleCustodyId} &middot;{' '}
                     <FinanceStatus value={incident.approvalState} />
                   </h3>
+                  <Button
+                    variant="secondary"
+                    disabled={navigation.pending}
+                    onClick={() => {
+                      if (selectedIncidentId !== incident.id)
+                        navigation.navigate(() => setSelectedIncidentId(incident.id));
+                    }}
+                  >
+                    Review and amendment history
+                  </Button>
                 </div>
                 <RecordView
                   value={{
@@ -1521,13 +1081,24 @@ function VehicleIncidents({ canSelf, canManage }: { canSelf: boolean; canManage:
                 />
               </article>
             ))}
+            {incidents.data?.items
+              .filter((item) => item.id === selectedIncidentId)
+              .map((item) => (
+                <VehicleIncidentManagement
+                  key={item.id}
+                  incident={item}
+                  onChanged={() => void incidents.refetch()}
+                />
+              ))}
             {incidents.data && (
               <HasMorePager
                 page={page}
                 hasMore={incidents.data.hasMore}
-                busy={incidents.isFetching}
-                onPrevious={() => setPage((value) => Math.max(1, value - 1))}
-                onNext={() => setPage((value) => value + 1)}
+                busy={incidents.isFetching || navigation.pending}
+                onPrevious={() =>
+                  navigation.navigate(() => setPage((value) => Math.max(1, value - 1)))
+                }
+                onNext={() => navigation.navigate(() => setPage((value) => value + 1))}
               />
             )}
           </QueryState>

@@ -38,7 +38,9 @@ const codes: Record<string, string> = {
   allowance_evidence_unavailable:
     'The retained duty evidence no longer matches this claim. Reload before deciding.',
   allowance_employment_source_unavailable:
-    'The employment source for this employee is unavailable. Contact support.',
+    'No employment assignment was found for your employee record on this date. HR/Admin must check the effective assignment and staff category before eligibility can be calculated.',
+  overtime_employment_history_conflict:
+    'More than one employment assignment covers this date. HR/Admin must resolve the overlapping assignment history.',
   allowance_source_limit: 'Too many sources were supplied for this claim. Contact support.',
   allowance_correction_source_unavailable:
     'The correction source for this claim is unavailable. Contact support.',
@@ -58,7 +60,7 @@ const codes: Record<string, string> = {
     'Management has not confirmed a money amount for this allowance kind yet.',
   policy_missing: 'No effective allowance policy is published for this employee on this date.',
   deployment_workflow_unavailable:
-    'Outstation and work-travel claims require the approved deployment workflow, which is not available yet.',
+    'The deployment service is unavailable for this request. No deployment calculation or claim is confirmed.',
   invalid_allowance_range:
     'Choose a range ending after the start date and no longer than 366 days.',
   invalid_allowance_kind: 'Choose a supported allowance kind.',

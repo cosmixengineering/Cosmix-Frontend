@@ -9,17 +9,6 @@ function all(user: SessionUser | null, permission: string) {
     ),
   );
 }
-function own(user: SessionUser | null, permission: string) {
-  return Boolean(
-    user?.account &&
-    user.grants.some(
-      (g) =>
-        g.permission === permission &&
-        [1, 2].includes(g.scopeKind) &&
-        g.targetId === user.account?.employeeId,
-    ),
-  );
-}
 function scoped(user: SessionUser | null, permission: string) {
   return hasReportGrant(user, permission);
 }
@@ -125,6 +114,21 @@ export function attendanceOperationalNavigation(user: SessionUser | null) {
       allowed: all(user, 'attendance.leaves.configure'),
     },
     {
+      to: '/hr/leave-encashment',
+      label: 'Encashment review',
+      allowed: all(user, 'attendance.leaves.review'),
+    },
+    {
+      to: '/hr/attendance/leave-benefits',
+      label: 'Leave benefits',
+      allowed: all(user, 'attendance.leaves.benefits.review'),
+    },
+    {
+      to: '/hr/attendance/recovery-work',
+      label: 'Recovery work review',
+      allowed: all(user, 'attendance.leaves.review'),
+    },
+    {
       to: '/hr/attendance/policies',
       label: 'Attendance policies',
       allowed:
@@ -165,72 +169,17 @@ export function attendanceOperationalNavigation(user: SessionUser | null) {
       label: 'Payroll inputs',
       allowed: scoped(user, 'attendance.payroll-inputs.read'),
     },
-    {
-      to: '/me/attendance/daily',
-      label: 'My attendance',
-      allowed: own(user, 'attendance.summaries.self'),
-    },
-    {
-      to: '/me/attendance/register',
-      label: 'My register',
-      allowed: own(user, 'attendance.summaries.self'),
-    },
-    {
-      to: '/me/attendance/calendar',
-      label: 'My calendar',
-      allowed: own(user, 'attendance.summaries.self'),
-    },
-    {
-      to: '/me/attendance/audit',
-      label: 'My punch history',
-      allowed: own(user, 'attendance.history.self'),
-    },
-    {
-      to: '/me/attendance/exceptions',
-      label: 'My exceptions',
-      allowed: own(user, 'attendance.exceptions.self'),
-    },
-    {
-      to: '/me/attendance/corrections',
-      label: 'My corrections',
-      allowed: own(user, 'attendance.corrections.self'),
-    },
-    {
-      to: '/me/attendance/carry-forward',
-      label: 'My carry-forward',
-      allowed: own(user, 'attendance.corrections.self'),
-    },
-    {
-      to: '/me/attendance/carry-forward/month',
-      label: 'My carry-forward ledger',
-      allowed: own(user, 'attendance.corrections.self'),
-    },
-    { to: '/me/overtime', label: 'My overtime', allowed: own(user, 'attendance.overtime.self') },
-    { to: '/account/leaves', label: 'My leave', allowed: own(user, 'attendance.leaves.self') },
-    {
-      to: '/hr/self-service/zones',
-      label: 'My zones',
-      allowed: own(user, 'attendance.zones.self'),
-    },
-    {
-      to: '/hr/self-service/site-reports',
-      label: 'My site reports',
-      allowed: own(user, 'attendance.site-reports.self'),
-    },
     { to: '/account/notifications', label: 'Notifications', allowed: Boolean(user?.account) },
   ].map((link) => ({
     ...link,
-    section:
-      link.to.startsWith('/me/') ||
-      link.to.startsWith('/account/') ||
-      link.to.startsWith('/hr/self-service/')
-        ? 'My services'
-        : /policies|leave-settings|capture-policy/.test(link.to)
-          ? 'Policies'
-          : /zones|zone-events|zone-windows|site-reports/.test(link.to)
-            ? 'Field operations'
-            : /reports|month-close|payroll-inputs/.test(link.to)
-              ? 'Reports and closure'
-              : 'Attendance',
+    section: link.to.startsWith('/account/')
+      ? 'Account'
+      : /policies|leave-settings|capture-policy/.test(link.to)
+        ? 'Policies'
+        : /zones|zone-events|zone-windows|site-reports/.test(link.to)
+          ? 'Field operations'
+          : /reports|month-close|payroll-inputs/.test(link.to)
+            ? 'Reports and closure'
+            : 'Attendance',
   }));
 }

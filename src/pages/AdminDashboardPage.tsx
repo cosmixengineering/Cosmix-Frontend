@@ -39,9 +39,9 @@ export function AdminDashboardPage() {
       color: '#2563eb',
     },
     {
-      to: '/hr/dashboard',
-      title: 'HR',
-      desc: 'Manage employees, recruitment & taxonomy',
+      to: '/admin/employees',
+      title: 'Employees',
+      desc: 'Manage employees, profiles & directory',
       icon: Users,
       bg: '#fdf2f8',
       color: '#db2777',
@@ -144,18 +144,25 @@ export function AdminDashboardPage() {
     },
   ];
 
+  const todayFormatted = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date());
+
   return (
     <div className="admin-dash-container">
       {/* 1. Welcome Section */}
       <div className="admin-welcome-section">
-        <div>
+        <div className="admin-welcome-text">
           <h1>Good Morning, {displayName}!</h1>
           <p>Here's what's happening across your organization today.</p>
         </div>
         <div className="admin-date-pill-container">
           <div className="admin-date-pill">
             <Calendar size={15} style={{ color: '#2563eb' }} />
-            <span>Tue, 15 Apr 2025</span>
+            <span>{todayFormatted}</span>
           </div>
           <span className="admin-date-subtitle">Make it a productive day!</span>
         </div>
@@ -164,19 +171,21 @@ export function AdminDashboardPage() {
       {/* 2. Top 4 Stat Cards */}
       <div className="admin-stat-grid">
         {/* Total Employees */}
-        <div className="admin-stat-card admin-stat-card--blue">
-          <div className="admin-stat-card-icon">
-            <Users size={22} />
-          </div>
-          <div className="admin-stat-card-content">
-            <p className="admin-stat-card-title">Total Employees</p>
-            <div className="admin-stat-card-value">248</div>
-            <div className="admin-stat-card-trend trend--positive">
-              <span>↑ 12%</span>
-              <span style={{ color: '#64748b' }}>vs last month</span>
+        <Link to="/admin/employees" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="admin-stat-card admin-stat-card--blue">
+            <div className="admin-stat-card-icon">
+              <Users size={22} />
+            </div>
+            <div className="admin-stat-card-content">
+              <p className="admin-stat-card-title">Total Employees</p>
+              <div className="admin-stat-card-value">248</div>
+              <div className="admin-stat-card-trend trend--positive">
+                <span>↑ 12%</span>
+                <span style={{ color: '#64748b' }}>vs last month</span>
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Active Departments */}
         <div className="admin-stat-card admin-stat-card--green">

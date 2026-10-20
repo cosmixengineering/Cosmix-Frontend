@@ -16,8 +16,10 @@ import {
   MapPin,
   CalendarDays,
   Banknote,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/auth/use-auth';
+import { useHrAccess } from '../hooks/use-hr-access';
 import { useHrQuery } from '../hooks/use-hr-queries';
 import { pageOf, employeeSchema } from '../schemas/contracts';
 import { siteSchema } from '../schemas/sites';
@@ -25,6 +27,17 @@ import { submissionSummarySchema } from '../schemas/approvals';
 import { useAttendanceAccess } from '@/modules/attendance/hooks/use-attendance-access';
 import { useAttendanceQuery } from '@/modules/attendance/hooks/use-attendance-query';
 import { leavePage } from '@/modules/attendance/operations/leave-policy/contracts';
+import {
+  dashboardCount,
+  dashboardCsv,
+  dashboardMoney,
+  dashboardRead,
+  dashboardStatusLabel,
+  type DashboardCount,
+} from '../utils/dashboard';
+import { dashboardAttendanceSummary, dashboardPayrollSummary } from '../schemas/dashboard';
+import { errorMessage, labelDate } from '../utils/messages';
+import { businessDate } from '@/utils/format';
 import '@/styles/hr-dashboard.css';
 
 interface ActivityItem {
@@ -34,92 +47,151 @@ interface ActivityItem {
   type: string;
   details: string;
   date: string;
-  status: 'Pending' | 'Approved' | 'Review';
+  status: 'Pending' | 'Cancellation pending';
   actionUrl?: string;
+}
+
+function ReadNotice({
+  label,
+  state,
+  query,
+}: {
+  label: string;
+  state: DashboardCount;
+  query: { error: unknown; refetch: () => unknown };
+}) {
+  if (state.status === 'ready') return null;
+  return (
+    <p className="dash-v3-notice" role={state.status === 'error' ? 'alert' : 'status'}>
+      <strong>{label}: </strong>
+      {state.status === 'error'
+        ? errorMessage(query.error)
+        : state.status === 'restricted'
+          ? 'Your current permissions do not allow this view.'
+          : state.label}
+      {(state.status === 'error' || state.status === 'unavailable') && (
+        <button type="button" className="hr-text-button" onClick={() => void query.refetch()}>
+          Retry
+        </button>
+      )}
+    </p>
+  );
 }
 
 export function HrDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const access = useAttendanceAccess();
+  const access = useHrAccess();
+  const attendanceAccess = useAttendanceAccess();
 
   const displayName = user?.account?.displayName || 'HR Officer';
 
-  // 1. Dynamic Backend Queries: Distinguish Real Active Employees vs Incomplete Drafts
-  const employeesQuery = useHrQuery('employees?page=1&pageSize=50', pageOf(employeeSchema), [
+  const canReadEmployees = access.can('hr.employees.read');
+  const canReadSites = access.can('hr.sites.read');
+  const canReadHiring = access.can('hr.employees.read', 'hr.employees.submissions.review');
+  const canReadLeaves = attendanceAccess.can('attendance.leaves.review');
+  const canReadAttendance = access.can('attendance.reports.read');
+  const canReadPayroll = access.can(
+    'hr.employees.compensation.read',
+    'attendance.payroll-handoff.read',
+  );
+  const year = Number(
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', year: 'numeric' }).format(
+      new Date(),
+    ),
+  );
+
+  const employeesQuery = useHrQuery('employees?page=1&pageSize=1', pageOf(employeeSchema), [
     'hr.employees.read',
   ]);
 
-  const activeEmployeesQuery = useHrQuery('employees?status=2&pageSize=1', pageOf(employeeSchema), [
-    'hr.employees.read',
-  ]);
+  // The API's status filter is onboarding status, not current employment status.
+  const approvedEmployeesQuery = useHrQuery(
+    'employees?status=2&pageSize=1',
+    pageOf(employeeSchema),
+    ['hr.employees.read'],
+  );
 
   const draftEmployeesQuery = useHrQuery('employees?status=0&pageSize=1', pageOf(employeeSchema), [
     'hr.employees.read',
   ]);
+  const sitesQuery = useHrQuery('sites?page=1&pageSize=1', pageOf(siteSchema), ['hr.sites.read']);
 
-  const { activeEmployeesCount, draftEmployeesCount } = useMemo(() => {
-    const items = employeesQuery.data?.items ?? [];
-
-    // Filter items explicitly (Status 2: Approved/Active, Status 0: Draft)
-    const activeFromItems = items.filter((e) => e.onboardingStatus === 2 || e.status === 2).length;
-    const draftsFromItems = items.filter((e) => e.onboardingStatus === 0 || e.status === 0).length;
-
-    const active =
-      typeof activeEmployeesQuery.data?.totalCount === 'number'
-        ? activeEmployeesQuery.data.totalCount
-        : activeFromItems;
-
-    const drafts =
-      typeof draftEmployeesQuery.data?.totalCount === 'number'
-        ? draftEmployeesQuery.data.totalCount
-        : draftsFromItems;
-
-    return {
-      activeEmployeesCount: active,
-      draftEmployeesCount: drafts,
-    };
-  }, [employeesQuery.data, activeEmployeesQuery.data, draftEmployeesQuery.data]);
-
-  // 2. Dynamic Backend Query: Real Operational Sites
-  const sitesQuery = useHrQuery('sites?page=1&pageSize=50', pageOf(siteSchema), ['hr.sites.read']);
-  const activeSitesCount = sitesQuery.data?.totalCount ?? sitesQuery.data?.items?.length ?? 0;
-
-  // 3. Dynamic Backend Query: Real Pending Hiring Submissions
   const submissionsQuery = useHrQuery(
     'employees/submissions?page=1&pageSize=10&status=1',
     pageOf(submissionSummarySchema),
     ['hr.employees.read', 'hr.employees.submissions.review'],
   );
-  const pendingSubmissionsCount =
-    submissionsQuery.data?.totalCount ?? submissionsQuery.data?.items?.length ?? 0;
-
-  // 4. Dynamic Backend Query: Real Pending Leaves Queue
   const pendingLeavesQuery = useAttendanceQuery(
-    '/leaves/admin/queue?pendingOnly=true&from=2026-01-01&to=2026-12-31&pageSize=20',
+    `/leaves/admin/queue?pendingOnly=true&from=${year}-01-01&to=${year}-12-31&pageSize=10`,
     leavePage,
-    access.can('attendance.leaves.review'),
+    canReadLeaves,
   );
-  const pendingLeavesCount =
-    pendingLeavesQuery.data?.totalCount ?? pendingLeavesQuery.data?.items?.length ?? 0;
+  const attendanceQuery = useHrQuery('dashboard/attendance', dashboardAttendanceSummary, [
+    'attendance.reports.read',
+  ]);
+  const payrollQuery = useHrQuery('dashboard/payroll', dashboardPayrollSummary, [
+    'hr.employees.compensation.read',
+    'attendance.payroll-handoff.read',
+  ]);
+  const employees = dashboardCount(employeesQuery, canReadEmployees, access.ready);
+  const approved = dashboardCount(approvedEmployeesQuery, canReadEmployees, access.ready);
+  const drafts = dashboardCount(draftEmployeesQuery, canReadEmployees, access.ready);
+  const sites = dashboardCount(sitesQuery, canReadSites, access.ready);
+  const hiring = dashboardCount(submissionsQuery, canReadHiring, access.ready);
+  const leaves = dashboardCount(pendingLeavesQuery, canReadLeaves, attendanceAccess.ready);
+  const attendance = dashboardRead(attendanceQuery, canReadAttendance, access.ready);
+  const payroll = dashboardRead(payrollQuery, canReadPayroll, access.ready);
+  const attendanceData = attendance.status === 'ready' ? attendanceQuery.data : undefined;
+  const payrollData = payroll.status === 'ready' ? payrollQuery.data : undefined;
+  const approvalsLabel =
+    hiring.count !== undefined && leaves.count !== undefined
+      ? `${hiring.count + leaves.count} Cases`
+      : hiring.status === 'ready' || leaves.status === 'ready'
+        ? 'Partial view'
+        : hiring.status === 'loading' || leaves.status === 'loading'
+          ? 'Loading…'
+          : hiring.status === 'restricted' && leaves.status === 'restricted'
+            ? 'Access restricted'
+            : 'Could not load';
+  const approvalsDetail = `Hires: ${hiring.label} • Leaves (${year}): ${leaves.label}`;
+  const attendanceLabel = attendanceData
+    ? `${attendanceData.withAcceptedSessionEvidence} / ${attendanceData.activeEmployees}`
+    : attendance.label;
+  const attendanceDetail = attendanceData
+    ? `Employees with accepted session evidence on ${attendanceData.businessDate} (Asia/Karachi).`
+    : 'Today’s attendance evidence for active employees.';
+  const salaryGroups = payrollData?.effectiveMonthlySalary;
+  const payrollLabel = !payrollData
+    ? payroll.label
+    : payrollData.activeEmployees === 0
+      ? 'No active employees'
+      : payrollData.monthlySalaryEmployeeCount === 0
+        ? payrollData.missingSalaryEmployeeCount > 0
+          ? 'Salary setup required'
+          : 'No monthly salaries'
+        : salaryGroups?.length === 1 && salaryGroups[0]
+          ? dashboardMoney(salaryGroups[0].grossAmount, salaryGroups[0].currency)
+          : `${salaryGroups?.length} currency totals`;
+  const payrollDetail = payrollData
+    ? `${payrollData.monthlySalaryEmployeeCount} of ${payrollData.activeEmployees} active employees have an effective monthly salary.`
+    : 'Effective monthly salary and prepared payroll handoff evidence.';
+  const dashboardReads = [
+    { query: employeesQuery, allowed: canReadEmployees },
+    { query: approvedEmployeesQuery, allowed: canReadEmployees },
+    { query: draftEmployeesQuery, allowed: canReadEmployees },
+    { query: sitesQuery, allowed: canReadSites },
+    { query: submissionsQuery, allowed: canReadHiring },
+    { query: pendingLeavesQuery, allowed: canReadLeaves },
+    { query: attendanceQuery, allowed: canReadAttendance },
+    { query: payrollQuery, allowed: canReadPayroll },
+  ];
+  const refreshing = dashboardReads.some(({ query, allowed }) => allowed && query.isFetching);
 
-  // Aggregated dynamic metrics (strictly computed on ACTIVE workforce, NEVER on drafts)
-  const totalPendingCases = pendingSubmissionsCount + pendingLeavesCount;
-  const turnoutPresent =
-    activeEmployeesCount > 0 ? Math.max(1, Math.round(activeEmployeesCount * 0.946)) : 0;
-  const turnoutPercent =
-    activeEmployeesCount > 0 ? ((turnoutPresent / activeEmployeesCount) * 100).toFixed(1) : '0.0';
-
-  const currentCycle =
-    new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) + ' Cycle';
-  const estimatedPayroll =
-    activeEmployeesCount > 0 ? (activeEmployeesCount * 0.085).toFixed(2) : '0.00';
-
-  // Dynamic merged activity list (Real backend submissions & leaves prioritized)
   const dynamicActivities: ActivityItem[] = useMemo(() => {
     const list: ActivityItem[] = [];
 
-    if (submissionsQuery.data?.items?.length) {
+    if (hiring.status === 'ready' && submissionsQuery.data?.items?.length) {
       for (const sub of submissionsQuery.data.items) {
         const empName = sub.name || `Employee #${sub.employeeNumber}`;
         const initials = empName
@@ -132,91 +204,143 @@ export function HrDashboardPage() {
           id: `sub-${sub.id}`,
           employeeName: empName,
           avatarText: initials || 'EM',
-          type: 'New Hire Onboarding Approval',
-          details: `Employee #${sub.employeeNumber} • Awaiting HR verification & audit review`,
-          date: new Date(sub.submittedAt).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          status: sub.status === 1 ? 'Pending' : sub.status === 2 ? 'Approved' : 'Review',
+          type: 'Hiring approval',
+          details: `Employee #${sub.employeeNumber} • Submitted for review`,
+          date: labelDate(sub.submittedAt),
+          status: 'Pending',
           actionUrl: '/hr/approvals',
         });
       }
     }
 
-    if (pendingLeavesQuery.data?.items?.length) {
+    if (leaves.status === 'ready' && pendingLeavesQuery.data?.items?.length) {
       for (const lr of pendingLeavesQuery.data.items) {
-        const emp = employeesQuery.data?.items?.find((e) => e.id === lr.employeeId);
-        const empName = emp?.name || 'Site Employee';
-        const initials = empName
-          .split(' ')
-          .map((n) => n[0])
-          .join('')
-          .slice(0, 2)
-          .toUpperCase();
+        const cancellationPending = lr.cancellations.some((request) => request.state === 0);
         list.push({
           id: `leave-${lr.id}`,
-          employeeName: empName,
-          avatarText: initials || 'LV',
+          employeeName: `Employee ID: ${lr.employeeId}`,
+          avatarText: 'LV',
           type: `${lr.typeName} Request`,
-          details: `${Math.round(lr.requestedMinutes / 480) || 1} Day(s) • ${lr.startDate} to ${lr.endDate}`,
-          date: 'Pending Review',
-          status: lr.state === 1 ? 'Approved' : lr.state === 2 ? 'Review' : 'Pending',
+          details: `${lr.requestedMinutes} minutes • ${lr.startDate} to ${lr.endDate}`,
+          date: 'Submission time unavailable',
+          status: cancellationPending ? 'Cancellation pending' : 'Pending',
           actionUrl: '/hr/leaves',
         });
       }
     }
 
-    if (list.length < 5 && employeesQuery.data?.items?.length) {
-      for (const emp of employeesQuery.data.items) {
-        if (list.length >= 5) break;
-        const empName = emp.name || `Employee #${emp.employeeNumber}`;
-        if (list.some((x) => x.employeeName === empName)) continue;
-        const inits = empName
-          .split(' ')
-          .map((n) => n[0])
-          .join('')
-          .slice(0, 2)
-          .toUpperCase();
-        list.push({
-          id: `emp-act-${emp.id}`,
-          employeeName: empName,
-          avatarText: inits || 'EM',
-          type: emp.status === 2 ? 'Active Staff Profile' : 'Onboarding Draft Record',
-          details: `Employee #${emp.employeeNumber} • System verified employee profile`,
-          date: 'Active',
-          status: emp.status === 2 ? 'Approved' : 'Pending',
-          actionUrl: `/hr/employees/${emp.id}`,
-        });
-      }
-    }
-
     return list;
-  }, [submissionsQuery.data, pendingLeavesQuery.data, employeesQuery.data]);
+  }, [submissionsQuery.data, pendingLeavesQuery.data, hiring.status, leaves.status]);
 
   const handleExportCSV = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,Metric,Value,Details\n' +
-      `Active Workforce,${activeEmployeesCount},Active Employees (${draftEmployeesCount} In-Progress Drafts)\n` +
-      `Today Turnout,${turnoutPresent}/${activeEmployeesCount},${turnoutPercent}% Present (${activeSitesCount} Sites)\n` +
-      `Pending Approvals,${totalPendingCases || draftEmployeesCount} Cases,${pendingSubmissionsCount} Hires | ${pendingLeavesCount} Leaves | ${draftEmployeesCount} Drafts\n` +
-      `Estimated Payroll,Rs. ${estimatedPayroll}M,${currentCycle}\n\n` +
-      'Employee,Request Type,Details,Status,Date\n' +
-      dynamicActivities
-        .map(
-          (a) =>
-            `"${a.employeeName}","${a.type}","${a.details.replace(/"/g, '""')}","${a.status}","${a.date}"`,
-        )
-        .join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = dashboardCsv([
+      ['Metric', 'Value', 'Details'],
+      ['Employee directory', employees.label, 'Unarchived directory records; includes drafts.'],
+      ['Approved onboarding', approved.label, 'Onboarding status; not an active employment total.'],
+      ['Draft onboarding', drafts.label, 'Draft onboarding records.'],
+      ['Site directory', sites.label, 'Site records; not an attendance total.'],
+      ["Today's turnout", attendanceLabel, attendanceDetail],
+      ...(attendanceData
+        ? [
+            ['Attendance generated UTC', attendanceData.generatedAtUtc, attendanceData.coverage],
+            ['Attendance business date', attendanceData.businessDate, attendanceData.timeZone],
+            ['Active attendance population', String(attendanceData.activeEmployees), ''],
+            ['Open session employees', String(attendanceData.openSessionEmployees), ''],
+            [
+              'Closed session only employees',
+              String(attendanceData.closedSessionOnlyEmployees),
+              '',
+            ],
+            [
+              'No accepted session evidence',
+              String(attendanceData.noAcceptedSessionEvidenceEmployees),
+              'No accepted session evidence is not an absence classification.',
+            ],
+            ['Classified employees', String(attendanceData.classifiedEmployees), ''],
+            ['Awaiting classification', String(attendanceData.notYetClassifiedEmployees), ''],
+            ['Current saved summaries', String(attendanceData.currentSavedSummaryEmployees), ''],
+            [
+              'Unsaved or stale summaries',
+              String(attendanceData.unsavedOrStaleSummaryEmployees),
+              '',
+            ],
+            ...Object.entries(attendanceData.classifiedStatusCounts).map(([status, count]) => [
+              `Attendance classification: ${dashboardStatusLabel(status)}`,
+              String(count),
+              attendanceData.businessDate,
+            ]),
+          ]
+        : []),
+      ['Pending approvals', approvalsLabel, approvalsDetail],
+      ['Pending hiring approvals', hiring.label, 'All pending hiring submissions.'],
+      [
+        'Pending leave approvals',
+        leaves.label,
+        `Leave and cancellation queue: calendar year ${year}.`,
+      ],
+      ['Monthly salary estimate', payrollLabel, payrollDetail],
+      ...(payrollData
+        ? [
+            ['Payroll summary generated UTC', payrollData.generatedAtUtc, payrollData.timeZone],
+            ['Salary effective date', payrollData.businessDate, 'Approved effective compensation.'],
+            ['Payroll period start', payrollData.periodStart, ''],
+            ['Payroll period end (exclusive)', payrollData.periodEndExclusive, ''],
+            ['Active salary population', String(payrollData.activeEmployees), ''],
+            ['Missing salary records', String(payrollData.missingSalaryEmployeeCount), ''],
+            ['Non-monthly salary records', String(payrollData.nonMonthlySalaryEmployeeCount), ''],
+            ['Future salary versions excluded', String(payrollData.futureSalaryVersions), ''],
+            [
+              'Pending compensation changes excluded',
+              String(payrollData.pendingCompensationChangeCount),
+              '',
+            ],
+            ...payrollData.effectiveMonthlySalary.flatMap((group) => [
+              [
+                `Monthly base salary (${group.currency})`,
+                dashboardMoney(group.baseAmount, group.currency),
+                `${group.employeeCount} employees`,
+              ],
+              [
+                `Monthly gross salary (${group.currency})`,
+                dashboardMoney(group.grossAmount, group.currency),
+                'Current monthly salary estimate before payroll adjustments.',
+              ],
+            ]),
+            ...(payrollData.handoff.length === 0
+              ? [
+                  [
+                    'Prepared handoff component groups',
+                    '0',
+                    'No prepared handoff components for active employees this month.',
+                  ],
+                ]
+              : payrollData.handoff.map((group) => [
+                  `Handoff components (${group.currency}, ${dashboardStatusLabel(group.state)})`,
+                  dashboardMoney(group.signedComponentTotal, group.currency),
+                  `${group.batchCount} batches; ${group.lockedBatchCount} locked; ${group.employeeCount} employees; ${group.lineCount} lines. Signed adjustment components, separate from base salary.`,
+                ])),
+          ]
+        : []),
+      [],
+      [
+        'Request list scope',
+        'Up to 10 requests per available queue.',
+        `Leaves cover calendar year ${year}; other approval queues are not included.`,
+      ],
+      ['Employee', 'Request type', 'Details', 'Status', 'Date'],
+      ...dynamicActivities.map((a) => [a.employeeName, a.type, a.details, a.status, a.date]),
+    ]);
+    const url = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `hr_summary_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `hr_summary_${attendanceData?.businessDate ?? payrollData?.businessDate ?? businessDate()}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -229,57 +353,51 @@ export function HrDashboardPage() {
         </div>
 
         <div className="dash-v3-actions">
+          <button
+            type="button"
+            className="dash-v3-btn-export"
+            disabled={refreshing}
+            onClick={() => {
+              for (const { query, allowed } of dashboardReads) if (allowed) void query.refetch();
+            }}
+          >
+            <RefreshCw size={14} aria-hidden="true" />
+            <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+          </button>
           <button type="button" className="dash-v3-btn-export" onClick={handleExportCSV}>
             <FileSpreadsheet size={14} color="#16a34a" />
-            <span>Excel Summary</span>
+            <span>CSV Summary</span>
           </button>
           <button type="button" className="dash-v3-btn-export" onClick={() => window.print()}>
             <FileText size={14} color="#dc2626" />
-            <span>PDF Report</span>
+            <span>Print / PDF</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Top 4 Compact Metric Cards (Strictly distinguishing Active Staff vs Drafts) */}
+      {/* Counts come only from successful, authorized API responses. */}
       <div className="dash-v3-kpis-grid">
-        {/* KPI 1: Total Workforce */}
         <Link
           to="/hr/employees"
           className="dash-v3-kpi-card"
           style={{ textDecoration: 'none', color: 'inherit' }}
         >
           <div className="dash-v3-kpi-left">
-            <span className="dash-v3-kpi-title">TOTAL WORKFORCE</span>
+            <span className="dash-v3-kpi-title">EMPLOYEE DIRECTORY</span>
             <div className="dash-v3-kpi-value">
-              {activeEmployeesCount}{' '}
-              <span
-                className="sub"
-                style={{
-                  color: activeEmployeesCount > 0 ? '#16a34a' : '#64748b',
-                  fontWeight: 650,
-                }}
-              >
-                Active
-              </span>
+              {employees.label}{' '}
+              {employees.status === 'ready' && <span className="sub">Records</span>}
             </div>
             <div className="dash-v3-kpi-sub">
-              {draftEmployeesCount > 0 ? (
-                <span style={{ color: '#d97706', fontWeight: 650 }}>
-                  📝 {draftEmployeesCount} Draft{draftEmployeesCount === 1 ? '' : 's'} in progress
-                </span>
-              ) : activeEmployeesCount > 0 ? (
-                <span className="color-green">↑ Active workforce</span>
-              ) : (
-                <span style={{ color: '#94a3b8' }}>0 active employees</span>
-              )}
+              Approved onboarding: {approved.label} • Drafts: {drafts.label}
             </div>
+            <div className="dash-v3-kpi-sub">Includes drafts; excludes archived records.</div>
           </div>
           <div className="dash-v3-kpi-icon-wrap bg-blue">
             <Users size={18} />
           </div>
         </Link>
 
-        {/* KPI 2: Today's Turnout */}
         <Link
           to="/hr/attendance"
           className="dash-v3-kpi-card"
@@ -287,25 +405,25 @@ export function HrDashboardPage() {
         >
           <div className="dash-v3-kpi-left">
             <span className="dash-v3-kpi-title">TODAY'S TURNOUT</span>
-            <div className="dash-v3-kpi-value">
-              {activeEmployeesCount > 0 ? `${turnoutPresent} / ${activeEmployeesCount}` : '0 / 0'}
-            </div>
-            <div className="dash-v3-kpi-sub">
-              {activeEmployeesCount > 0 ? (
-                <span className="color-green">
-                  ● {turnoutPercent}% Present ({activeSitesCount} Sites)
-                </span>
-              ) : (
-                <span style={{ color: '#94a3b8' }}>0% Present (No active employees)</span>
-              )}
-            </div>
+            <div className="dash-v3-kpi-value">{attendanceLabel}</div>
+            <div className="dash-v3-kpi-sub">{attendanceDetail}</div>
+            {attendanceData && (
+              <>
+                <div className="dash-v3-kpi-sub">
+                  Open: {attendanceData.openSessionEmployees} • Closed:{' '}
+                  {attendanceData.closedSessionOnlyEmployees}
+                </div>
+                <div className="dash-v3-kpi-sub">
+                  Awaiting classification: {attendanceData.notYetClassifiedEmployees}
+                </div>
+              </>
+            )}
           </div>
           <div className="dash-v3-kpi-icon-wrap bg-green">
             <UserCheck size={18} />
           </div>
         </Link>
 
-        {/* KPI 3: Pending Approvals */}
         <Link
           to="/hr/approvals"
           className="dash-v3-kpi-card"
@@ -313,48 +431,153 @@ export function HrDashboardPage() {
         >
           <div className="dash-v3-kpi-left">
             <span className="dash-v3-kpi-title color-orange">PENDING APPROVALS</span>
-            <div className="dash-v3-kpi-value val-orange">
-              {totalPendingCases > 0
-                ? `${totalPendingCases} Cases`
-                : draftEmployeesCount > 0
-                  ? `${draftEmployeesCount} Drafts`
-                  : '0 Cases'}
-            </div>
-            <div className="dash-v3-kpi-sub">
-              {pendingSubmissionsCount > 0 || pendingLeavesCount > 0 ? (
-                `${pendingSubmissionsCount} Hires, ${pendingLeavesCount} Leaves`
-              ) : draftEmployeesCount > 0 ? (
-                <span style={{ color: '#b45309' }}>Incomplete draft forms in HR</span>
-              ) : (
-                'All approval queues clear'
-              )}
-            </div>
+            <div className="dash-v3-kpi-value val-orange">{approvalsLabel}</div>
+            <div className="dash-v3-kpi-sub">{approvalsDetail}</div>
+            <div className="dash-v3-kpi-sub">Hiring and leave queues only.</div>
           </div>
           <div className="dash-v3-kpi-icon-wrap bg-orange">
             <ClipboardList size={18} />
           </div>
         </Link>
 
-        {/* KPI 4: Estimated Payroll */}
         <div className="dash-v3-kpi-card">
           <div className="dash-v3-kpi-left">
-            <span className="dash-v3-kpi-title">ESTIMATED PAYROLL</span>
-            <div className="dash-v3-kpi-value">
-              {activeEmployeesCount > 0 ? `Rs. ${estimatedPayroll}M` : 'Rs. 0.00'}
-            </div>
-            <div className="dash-v3-kpi-sub">
-              {activeEmployeesCount > 0 ? (
-                <span>{currentCycle}</span>
-              ) : (
-                <span style={{ color: '#94a3b8' }}>No payroll for draft profiles</span>
-              )}
-            </div>
+            <span className="dash-v3-kpi-title">MONTHLY SALARY ESTIMATE</span>
+            <div className="dash-v3-kpi-value dash-v3-salary-value">{payrollLabel}</div>
+            <div className="dash-v3-kpi-sub">{payrollDetail}</div>
+            {payrollData && (
+              <>
+                <div className="dash-v3-kpi-sub">
+                  Missing salary: {payrollData.missingSalaryEmployeeCount} • Non-monthly:{' '}
+                  {payrollData.nonMonthlySalaryEmployeeCount}
+                </div>
+                <div className="dash-v3-kpi-sub">
+                  Future versions excluded: {payrollData.futureSalaryVersions}
+                </div>
+              </>
+            )}
           </div>
           <div className="dash-v3-kpi-icon-wrap bg-purple">
             <Wallet size={18} />
           </div>
         </div>
       </div>
+
+      <ReadNotice label="Employee directory" state={employees} query={employeesQuery} />
+      <ReadNotice label="Approved onboarding" state={approved} query={approvedEmployeesQuery} />
+      <ReadNotice label="Draft onboarding" state={drafts} query={draftEmployeesQuery} />
+      <ReadNotice label="Site directory" state={sites} query={sitesQuery} />
+      <ReadNotice label="Hiring queue" state={hiring} query={submissionsQuery} />
+      <ReadNotice label={`Leave queue (${year})`} state={leaves} query={pendingLeavesQuery} />
+      <ReadNotice label="Attendance summary" state={attendance} query={attendanceQuery} />
+      <ReadNotice label="Salary and payroll summary" state={payroll} query={payrollQuery} />
+
+      {(attendanceData || payrollData) && (
+        <div className="dash-v3-source-grid">
+          {attendanceData && (
+            <section className="dash-v3-source-card" aria-label="Attendance source details">
+              <h2>Today's attendance evidence</h2>
+              <p className="dash-v3-source-meta">
+                {attendanceData.businessDate} • Asia/Karachi • Updated{' '}
+                {labelDate(attendanceData.generatedAtUtc)}
+              </p>
+              <p className="dash-v3-source-note">
+                Population: {attendanceData.activeEmployees} verified active employees.
+              </p>
+              <dl className="dash-v3-source-counts">
+                <div>
+                  <dt>No accepted session evidence</dt>
+                  <dd>{attendanceData.noAcceptedSessionEvidenceEmployees}</dd>
+                </div>
+                <div>
+                  <dt>Classified employees</dt>
+                  <dd>{attendanceData.classifiedEmployees}</dd>
+                </div>
+                <div>
+                  <dt>Current saved summaries</dt>
+                  <dd>{attendanceData.currentSavedSummaryEmployees}</dd>
+                </div>
+                <div>
+                  <dt>Unsaved or stale summaries</dt>
+                  <dd>{attendanceData.unsavedOrStaleSummaryEmployees}</dd>
+                </div>
+              </dl>
+              {Object.values(attendanceData.classifiedStatusCounts).some((count) => count > 0) && (
+                <div className="dash-v3-source-tags">
+                  {Object.entries(attendanceData.classifiedStatusCounts)
+                    .filter(([, count]) => count > 0)
+                    .map(([status, count]) => (
+                      <span key={status}>
+                        {dashboardStatusLabel(status)}: <strong>{count}</strong>
+                      </span>
+                    ))}
+                </div>
+              )}
+              <p className="dash-v3-source-note">
+                A missing session is not an absence classification. Turnout counts accepted session
+                evidence for active employees.
+              </p>
+            </section>
+          )}
+          {payrollData && (
+            <section className="dash-v3-source-card" aria-label="Salary and payroll source details">
+              <h2>Salary &amp; payroll sources</h2>
+              <p className="dash-v3-source-meta">
+                Month {payrollData.periodStart.slice(0, 7)} • Effective {payrollData.businessDate} •
+                Updated {labelDate(payrollData.generatedAtUtc)}
+              </p>
+              <p className="dash-v3-source-note">
+                Population: {payrollData.activeEmployees} verified active employees.
+              </p>
+              {payrollData.effectiveMonthlySalary.map((group) => (
+                <div className="dash-v3-salary-source" key={group.currency}>
+                  <strong>{dashboardMoney(group.grossAmount, group.currency)} monthly gross</strong>
+                  <span>
+                    {group.employeeCount} employees • Base{' '}
+                    {dashboardMoney(group.baseAmount, group.currency)}
+                  </span>
+                </div>
+              ))}
+              <p className="dash-v3-source-note">
+                {payrollData.missingSalaryEmployeeCount > 0
+                  ? `${payrollData.missingSalaryEmployeeCount} active employees need an effective salary record. `
+                  : 'Effective salary coverage checked for all active employees. '}
+                {payrollData.nonMonthlySalaryEmployeeCount} non-monthly records excluded from
+                monthly totals. Future versions: {payrollData.futureSalaryVersions}; pending
+                changes: {payrollData.pendingCompensationChangeCount}, both excluded.
+              </p>
+              <h3>Prepared handoff components</h3>
+              {payrollData.handoff.length === 0 ? (
+                <p className="dash-v3-source-note">
+                  No prepared handoff components for active employees this month.
+                </p>
+              ) : (
+                <ul className="dash-v3-handoff-list">
+                  {payrollData.handoff.map((group) => (
+                    <li key={`${group.currency}:${group.state}`}>
+                      <strong>
+                        {dashboardMoney(group.signedComponentTotal, group.currency)} ·{' '}
+                        {dashboardStatusLabel(group.state)}
+                      </strong>
+                      <span>
+                        {group.batchCount} batches • {group.lockedBatchCount} locked •{' '}
+                        {group.employeeCount} employees • {group.lineCount} lines
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="dash-v3-source-note">
+                Monthly gross is a salary estimate before payroll adjustments. Handoff amounts are
+                signed adjustment components, separate from base salary.
+              </p>
+              <Link to="/hr/payroll-handoff" className="dash-v3-link-more">
+                Review payroll handoff <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
+            </section>
+          )}
+        </div>
+      )}
 
       {/* 3. 8 Enterprise Module Quick Launch Cards Grid (4 columns x 2 rows) */}
       <div className="dash-v3-modules-grid">
@@ -465,14 +688,18 @@ export function HrDashboardPage() {
 
       {/* 4. Bottom Activity & Approvals Section */}
       <div className="dash-v3-section-head">
-        <span className="dash-v3-section-title">RECENT HR ACTIVITY & PENDING APPROVALS</span>
+        <span className="dash-v3-section-title">PENDING HIRING &amp; LEAVE REQUESTS</span>
         <Link to="/hr/approvals" className="dash-v3-link-more">
-          <span>View Full Logs</span>
+          <span>Hiring queue</span>
           <ArrowUpRight size={13} />
         </Link>
       </div>
 
       <div className="dash-v3-activity-card">
+        <p className="dash-v3-notice">
+          Up to 10 requests per available queue. Leaves cover calendar year {year}; other approval
+          queues are not included.
+        </p>
         <table className="dash-v3-table">
           <thead>
             <tr>
@@ -485,6 +712,15 @@ export function HrDashboardPage() {
             </tr>
           </thead>
           <tbody>
+            {dynamicActivities.length === 0 && (
+              <tr>
+                <td colSpan={6}>
+                  {hiring.status === 'ready' && leaves.status === 'ready'
+                    ? 'No pending hiring or leave requests in the displayed ranges.'
+                    : 'No requests to display from the available queue results. Check the queue status above.'}
+                </td>
+              </tr>
+            )}
             {dynamicActivities.map((act) => (
               <tr key={act.id}>
                 <td>
@@ -529,18 +765,8 @@ export function HrDashboardPage() {
                       borderRadius: '4px',
                       fontSize: '11px',
                       fontWeight: 600,
-                      backgroundColor:
-                        act.status === 'Approved'
-                          ? '#dcfce7'
-                          : act.status === 'Review'
-                            ? '#fef3c7'
-                            : '#ffedd5',
-                      color:
-                        act.status === 'Approved'
-                          ? '#15803d'
-                          : act.status === 'Review'
-                            ? '#b45309'
-                            : '#c2410c',
+                      backgroundColor: '#ffedd5',
+                      color: '#c2410c',
                     }}
                   >
                     {act.status}

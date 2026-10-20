@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/auth/use-auth';
+import { isSystemAdmin } from '@/auth/contracts';
 import { LoadingState } from '@/components/feedback/LoadingState';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { SignInPage } from '@/pages/SignInPage';
@@ -52,14 +53,7 @@ function RootRedirect() {
   const { user, status } = useAuth();
   if (status === 'loading') return null;
   if (status !== 'authenticated') return <Navigate to="/sign-in" replace />;
-  const isAdmin = Boolean(
-    user?.grants.some(
-      (g: { permission: string }) =>
-        g.permission === 'hr.organization.manage' ||
-        g.permission === 'hr.employees.submissions.review' ||
-        g.permission.startsWith('admin.'),
-    ),
-  );
+  const isAdmin = isSystemAdmin(user);
   return <Navigate to={isAdmin ? '/admin/dashboard' : '/hr/dashboard'} replace />;
 }
 
@@ -139,6 +133,16 @@ export function AppRoutes() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="employees/new" element={<NewEmployeePage />} />
+          <Route path="employees/:employeeId/hiring" element={<EmployeeHiringPage />} />
+          <Route path="employees/:employeeId" element={<EmployeeDetailPage />} />
+          <Route path="employees/:employeeId/assets" element={<EmployeeAssetsPage />} />
+          <Route path="employees/:employeeId/sims" element={<EmployeeSimsPage />} />
+          <Route
+            path="employees/:employeeId/certifications"
+            element={<EmployeeCertificationsPage />}
+          />
           <Route path="approvals" element={<AdminApprovalsPage />} />
           <Route path="panel" element={<AdminModulePage moduleKey="panel" />} />
           <Route path="finance" element={<AdminModulePage moduleKey="finance" />} />

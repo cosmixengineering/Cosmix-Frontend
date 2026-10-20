@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+  useLocation,
+} from 'react-router-dom';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -15,6 +22,7 @@ import {
   Fingerprint,
   Sparkles,
   Clock,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useHrAccess } from '../hooks/use-hr-access';
@@ -24,6 +32,7 @@ import { currentUpdateSchema } from '../schemas/updates';
 import { ApiError } from '@/services/api/api-error';
 import { id, writeResult } from '../schemas/contracts';
 import { onboardingLabels } from '../types/contracts';
+import type { Profile } from '../types/hiring';
 import { ActionMessage, Denied, QueryState } from '../components/Feedback';
 import { ProfileForm } from '../components/hiring/ProfileForm';
 import { SensitiveSection } from '../components/hiring/SensitiveForms';
@@ -31,6 +40,27 @@ import { EmployeeDocuments } from '../components/documents/EmployeeDocuments';
 import { SubmissionReview } from '../components/hiring/SubmissionReview';
 import { EmployeeBiometricSection } from '../components/employee/EmployeeBiometricSection';
 import '@/styles/onboarding-stepper.css';
+
+export function isStep1Complete(p: Profile | null | undefined): boolean {
+  if (!p) return false;
+  if (!p.fullLegalName?.trim()) return false;
+  if (!p.identityDocumentType) return false;
+  if (!p.identityDocumentNumber?.trim()) return false;
+  if (!p.dateOfBirth) return false;
+  if (!p.gender?.trim()) return false;
+  if (!p.personalPhone?.trim()) return false;
+  if (!p.currentAddress?.line1?.trim()) return false;
+  if (!p.permanentAddress?.line1?.trim()) return false;
+  if (!p.emergencyContact?.name?.trim()) return false;
+  if (!p.emergencyContact?.phone?.trim()) return false;
+  if (!p.departmentId) return false;
+  if (!p.designationId) return false;
+  if (!p.staffCategoryId) return false;
+  if (!p.employmentTypeId) return false;
+  if (!p.reportingManagerEmployeeId) return false;
+  if (!p.joinedOn) return false;
+  return true;
+}
 
 const ONBOARDING_STEPS = [
   {
@@ -109,21 +139,23 @@ export function NewEmployeePage() {
   const access = useHrAccess();
   const action = useHrAction();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
   const createdRef = useRef(false);
 
   useEffect(() => {
     if (access.can('hr.employees.read', 'hr.employees.drafts.manage') && !createdRef.current) {
       createdRef.current = true;
       void action.run('employees', undefined, 'POST', writeResult).then((r) => {
-        if (r) void navigate(`/hr/employees/${r.employeeId}/hiring`, { replace: true });
+        if (r) void navigate(`${basePath}/employees/${r.employeeId}/hiring`, { replace: true });
       });
     }
-  }, [access, action, navigate]);
+  }, [access, action, navigate, basePath]);
 
   if (!access.can('hr.employees.read', 'hr.employees.drafts.manage')) return <Denied />;
   return (
     <>
-      <Link className="hr-back" to="/hr/employees">
+      <Link className="hr-back" to={`${basePath}/employees`}>
         <ArrowLeft size={16} />
         Employees
       </Link>
@@ -137,7 +169,8 @@ export function NewEmployeePage() {
           onClick={() => {
             createdRef.current = false;
             void action.run('employees', undefined, 'POST', writeResult).then((r) => {
-              if (r) void navigate(`/hr/employees/${r.employeeId}/hiring`, { replace: true });
+              if (r)
+                void navigate(`${basePath}/employees/${r.employeeId}/hiring`, { replace: true });
             });
           }}
         >
@@ -163,6 +196,8 @@ export function EmployeeHiringPage() {
 function HiringWorkspace({ employeeId }: { employeeId: string }) {
   const access = useHrAccess();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
   const [params] = useSearchParams();
   const tab = params.get('tab') ?? 'profile';
   const [saved, setSaved] = useState(false);
@@ -181,12 +216,23 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
     ['hr.employees.read'],
     !needsStatusCheck || unapproved,
   );
+  const canShowHiring =
+    access.can('hr.employees.read') &&
+    (!needsStatusCheck || (!current.data && unapproved)) &&
+    query.data?.employee.onboardingStatus !== 2;
+
+  useEffect(() => {
+    if (canShowHiring && query.data && tab !== 'profile' && !isStep1Complete(query.data.profile)) {
+      navigate('?tab=profile', { replace: true });
+    }
+  }, [canShowHiring, query.data, tab, navigate]);
+
   if (!access.can('hr.employees.read')) return <Denied />;
   if (needsStatusCheck && current.data)
-    return <Navigate to={`/hr/employees/${employeeId}`} replace />;
+    return <Navigate to={`${basePath}/employees/${employeeId}`} replace />;
   if (needsStatusCheck && !unapproved) return <QueryState query={current}>{null}</QueryState>;
   if (query.data?.employee.onboardingStatus === 2)
-    return <Navigate to={`/hr/employees/${employeeId}`} replace />;
+    return <Navigate to={`${basePath}/employees/${employeeId}`} replace />;
   const tabs = [
     { key: 'profile', label: 'Profile', allowed: true },
     { key: 'financial', label: 'Financial', allowed: access.can('hr.employees.financial.read') },
@@ -208,6 +254,8 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
     }
   };
 
+  const step1Done = query.data ? isStep1Complete(query.data.profile) : false;
+
   const stepIndex = ONBOARDING_STEPS.findIndex((s) => s.key === tab);
   const currentStep = ONBOARDING_STEPS[stepIndex >= 0 ? stepIndex : 0]!;
   const prevStep = stepIndex > 0 ? ONBOARDING_STEPS[stepIndex - 1] : null;
@@ -216,7 +264,7 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
 
   return (
     <>
-      <Link className="hr-back" to="/hr/employees">
+      <Link className="hr-back" to={`${basePath}/employees`}>
         <ArrowLeft size={16} />
         Employees
       </Link>
@@ -273,8 +321,10 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
                     >
                       {ONBOARDING_STEPS.map((s, idx) => {
                         const allowed = tabs.find((t) => t.key === s.key)?.allowed ?? false;
+                        const isLocked = idx > 0 && !step1Done;
+                        const isClickable = allowed && !isLocked;
                         const isActive = tab === s.key;
-                        const isCompleted = stepIndex > idx;
+                        const isCompleted = stepIndex > idx || (idx === 0 && step1Done);
 
                         return (
                           <div
@@ -287,22 +337,41 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
                             }}
                           >
                             <Link
-                              to={allowed ? `?tab=${s.key}` : '#'}
-                              className={`onboarding-step-pill ${isActive ? 'is-active' : ''} ${isCompleted ? 'is-completed' : ''}`}
+                              to={isClickable ? `?tab=${s.key}` : '#'}
+                              className={`onboarding-step-pill ${isActive ? 'is-active' : ''} ${isCompleted ? 'is-completed' : ''} ${isLocked ? 'is-locked' : ''}`}
+                              title={
+                                isLocked
+                                  ? 'Complete and save Step 1 (Profile & Workplace Placement) first to unlock this step'
+                                  : !allowed
+                                    ? 'Insufficient permissions'
+                                    : s.title
+                              }
                               style={{
-                                opacity: allowed ? 1 : 0.45,
-                                cursor: allowed ? 'pointer' : 'not-allowed',
+                                opacity: isClickable ? 1 : 0.45,
+                                cursor: isClickable ? 'pointer' : 'not-allowed',
                               }}
                               onClick={(e) => {
-                                if (!allowed) e.preventDefault();
-                                setSaved(false);
+                                if (!isClickable) {
+                                  e.preventDefault();
+                                } else {
+                                  setSaved(false);
+                                }
                               }}
                             >
                               <div className="onboarding-step-bubble">
-                                {isCompleted ? <CheckCircle2 size={14} /> : s.stepNumber}
+                                {isLocked ? (
+                                  <Lock size={12} />
+                                ) : isCompleted ? (
+                                  <CheckCircle2 size={14} />
+                                ) : (
+                                  s.stepNumber
+                                )}
                               </div>
                               <div className="onboarding-step-label-group">
-                                <span className="onboarding-step-tag">{s.stepTag}</span>
+                                <span className="onboarding-step-tag">
+                                  {s.stepTag}
+                                  {isLocked && <span className="step-locked-badge">LOCKED</span>}
+                                </span>
                                 <span className="onboarding-step-name">{s.shortTitle}</span>
                               </div>
                             </Link>
@@ -337,6 +406,27 @@ function HiringWorkspace({ employeeId }: { employeeId: string }) {
                       </span>
                     </div>
                   </div>
+
+                  {!step1Done && (
+                    <div className="onboarding-locked-banner">
+                      <div className="onboarding-locked-banner-left">
+                        <div className="onboarding-locked-banner-icon">
+                          <Lock size={18} />
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: '13.5px', color: '#92400e' }}>
+                            Step 1 Required: Profile &amp; Workplace Placement
+                          </strong>
+                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#78350f' }}>
+                            Please fill in mandatory personal identity, contacts, addresses, and
+                            workplace placement (*) and click &quot;Save &amp; Continue&quot;.
+                            Subsequent steps (Financial, Medical, Documents, Biometrics, and
+                            Submission) will unlock automatically once Step 1 is saved.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="onboarding-step-content-box" key={tab}>

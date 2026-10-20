@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -47,6 +47,8 @@ function formatDate(isoDate?: string | null) {
 export function EmployeesPage() {
   const access = useHrAccess();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
   const createAction = useHrAction();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -63,7 +65,7 @@ export function EmployeesPage() {
   const handleCreateNewEmployee = async () => {
     const r = await createAction.run('employees', undefined, 'POST', writeResult);
     if (r) {
-      void navigate(`/hr/employees/${r.employeeId}/hiring`);
+      void navigate(`${basePath}/employees/${r.employeeId}/hiring`);
     }
   };
 
@@ -177,7 +179,7 @@ export function EmployeesPage() {
                   cell: (r) => (
                     <Link
                       className="hr-employee-link"
-                      to={`/hr/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
+                      to={`${basePath}/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
                       style={{ textDecoration: 'none' }}
                     >
                       <span className="hr-avatar">
@@ -436,7 +438,7 @@ export function EmployeesPage() {
                       }}
                     >
                       <Link
-                        to={`/hr/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
+                        to={`${basePath}/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
                         style={{
                           padding: '4.5px 9px',
                           fontSize: '11.5px',
@@ -469,7 +471,7 @@ export function EmployeesPage() {
                         className="icon-button"
                         aria-label={`Open ${r.name ?? 'draft'}`}
                         title="Open details"
-                        to={`/hr/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
+                        to={`${basePath}/employees/${r.id}${r.onboardingStatus === 2 ? '' : '/hiring'}`}
                         style={{ width: '28px', height: '28px', borderRadius: '6px' }}
                       >
                         <ArrowUpRight size={14} />

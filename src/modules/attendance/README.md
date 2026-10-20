@@ -44,3 +44,34 @@ completed by adding an office roster. React Native remains outside this package.
 - `index.ts`: public entry for app composition. Internal imports stay relative.
 
 Reuse `src/components` for general controls. Do not deep-import another module. Agree cross-module contracts with the owner. Server authorization and policy calculations remain authoritative.
+
+## Leave web boundary - 19 October 2026
+
+The owner confirmed that personal leave requests and personal balances belong in
+the employee mobile application, including for employees who work in HR. The HR
+web Leave section is for employee management, not a second personal leave portal.
+
+`/hr/leaves` and `/hr/leave-management` now use the scoped employee calendar when
+`attendance.leaves.team-calendar.read` is assigned. The existing employee/scope
+selector supplies an explicit employee; the server rechecks current and historical
+scope. The API returns only recorded dates and statuses, not balances, reasons,
+leave types or inferred absence. The inclusive date range is limited to 31 days.
+Missing access and failed/empty reads remain distinct, with no sample records.
+
+Authorized Admin review uses the existing `/hr/attendance/leaves` workflow and
+`attendance.leaves.review`; settings use `attendance.leaves.configure`. The change
+does not grant HR approval authority or bypass fixed-role server checks. It removes
+the mixed personal balance cards, self-request form, fabricated requests/calendar,
+hardcoded quota calculations and optimistic fake approval actions from the old page.
+The personal `/account/leaves` routes and navigation item are no longer registered;
+the leave workspace shortcut points to `/hr/leaves`. Other modules' web self-service
+surfaces are outside this focused change. Backend/mobile APIs are unchanged.
+
+Verification: production TypeScript/Vite build passed with its large-chunk warning;
+changed-file ESLint, Prettier and diff checks passed. Full `npm run verify` stopped
+on an existing conditional `useEffect` in the already-modified
+`src/modules/hr/pages/EmployeeHiringPage.tsx:240`. The repository-wide diff check
+also found an unrelated extra EOF blank line in `src/styles/onboarding-stepper.css`.
+Neither unrelated file was changed. Authenticated visual/API acceptance remains
+unverified: the running site redirected to sign-in and showed a connection error.
+No mock session, API host, database migration or real employee write was introduced.

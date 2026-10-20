@@ -9,7 +9,7 @@ import { authAdapter } from '@/auth/adapter';
 import { authErrorMessage } from '@/auth/messages';
 import { useAuth } from '@/auth/use-auth';
 import { useChallengeTime } from '@/auth/ChallengeStatus';
-import type { OtpChallenge } from '@/auth/contracts';
+import { type OtpChallenge, isSystemAdmin } from '@/auth/contracts';
 
 export function ForgotPasswordPage() {
   const { user, status, passwordResetCompleted } = useAuth();
@@ -66,14 +66,7 @@ export function ForgotPasswordPage() {
         input.value = '';
       });
   }
-  const isAdmin = Boolean(
-    user?.grants.some(
-      (g: { permission: string }) =>
-        g.permission === 'hr.organization.manage' ||
-        g.permission === 'hr.employees.submissions.review' ||
-        g.permission.startsWith('admin.'),
-    ),
-  );
+  const isAdmin = isSystemAdmin(user);
   if (status === 'authenticated') {
     return <Navigate to={isAdmin ? '/admin/dashboard' : '/hr/dashboard'} replace />;
   }

@@ -1,15 +1,30 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { FileSpreadsheet, Search, RefreshCw } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/auth/use-auth';
+import type { SessionUser } from '@/auth/types';
 import { TextInput } from '@/components/forms/TextInput';
 import { SelectInput } from '@/components/forms/SelectInput';
 import { Button } from '@/components/ui/Button';
-import { useHrAccess } from '../../hr/hooks/use-hr-access';
 import { useHrLifetime } from '../../hr/hooks/use-hr-lifetime';
 import { errorMessage } from '../../hr/utils/messages';
-import { fetchReport, fetchReportTypes, exportReport } from '../api/reports-api';
-import { exportFormatOptions, type ReportEnvelope } from '../schemas/report-contracts';
+import { fetchReportTypes } from '../api/reports-api';
+import {
+  exportReportPage,
+  fetchExportableReport,
+  isValidReportExportReason,
+  saveReportBlob,
+} from '../api/report-export-jobs';
+import { HrReportExportJobs } from '../components/HrReportExportJobs';
+import {
+  exportFormatOptions,
+  type ReportEnvelope,
+  type ReportFilter,
+} from '../schemas/report-contracts';
 
 const permissions = { read: 'hr.reports.read', export: 'hr.reports.export' };
+
+type ReportPreview = ReportEnvelope & { requestedFilter: ReportFilter };
 
 const reportLabels: Record<string, string> = {
   'daily-attendance': 'Daily Attendance',
@@ -29,8 +44,24 @@ const reportLabels: Record<string, string> = {
 };
 
 export function HrReportsPage() {
-  const access = useHrAccess();
-  if (!access.can(permissions.read)) {
+  const { user, status } = useAuth();
+  const cache = useQueryClient();
+  const [session, setSession] = useState({ user, revision: 0 });
+  const [cacheEpoch, setCacheEpoch] = useState(0);
+  if (session.user !== user) setSession({ user, revision: session.revision + 1 });
+  useEffect(
+    () =>
+      cache.getQueryCache().subscribe((event) => {
+        if (
+          event.type === 'removed' &&
+          event.query.queryKey[0] === 'reports' &&
+          event.query.getObserversCount() > 0
+        )
+          setCacheEpoch((value) => value + 1);
+      }),
+    [cache],
+  );
+  if (status !== 'authenticated' || !hasReportPermission(user, permissions.read)) {
     return (
       <section aria-label="HR reports">
         <div className="hr-page-heading">
@@ -43,10 +74,33 @@ export function HrReportsPage() {
       </section>
     );
   }
-  return <ReportWorkspace key={access.subject} canExport={access.can(permissions.export)} />;
+  const subject = `${user?.account?.accountId}:${session.revision}:${cacheEpoch}`;
+  return (
+    <ReportWorkspace
+      key={subject}
+      subject={subject}
+      canExport={hasReportPermission(user, permissions.export)}
+    />
+  );
 }
 
-function ReportWorkspace({ canExport }: { canExport: boolean }) {
+// This only opens the scoped UI. Current and historical source authorization stays on the server.
+function hasReportPermission(user: SessionUser | null, permission: string) {
+  return Boolean(
+    user?.account &&
+    user.grants.some(
+      (grant) =>
+        grant.permission === permission &&
+        ((grant.scopeKind === 7 && grant.targetId === null) ||
+          (grant.targetId !== null &&
+            grant.targetId !== '00000000-0000-0000-0000-000000000000' &&
+            ((grant.scopeKind === 1 && grant.targetId === user.account?.employeeId) ||
+              [2, 3, 4, 5, 6].includes(grant.scopeKind)))),
+    ),
+  );
+}
+
+function ReportWorkspace({ canExport, subject }: { canExport: boolean; subject: string }) {
   const lifetime = useHrLifetime();
   const [types, setTypes] = useState<string[]>([]);
   const [typesError, setTypesError] = useState<string | null>(null);
@@ -65,7 +119,7 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
     page: '1',
     pageSize: '100',
   });
-  const [result, setResult] = useState<ReportEnvelope | null>(null);
+  const [result, setResult] = useState<ReportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -75,16 +129,20 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
   const [exportReason, setExportReason] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const inFlight = useRef(false);
+  const exportInFlight = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchReportTypes(controller.signal)
-      .then((list) => setTypes(list))
+    const signal = AbortSignal.any([controller.signal, lifetime()]);
+    fetchReportTypes(signal)
+      .then((list) => {
+        if (!signal.aborted) setTypes(list);
+      })
       .catch((failure) => {
-        if (!controller.signal.aborted) setTypesError(errorMessage(failure));
+        if (!signal.aborted) setTypesError(errorMessage(failure));
       });
     return () => controller.abort();
-  }, [lifetime]);
+  }, []);
 
   const columns = useMemo(() => {
     const first = result?.rows[0];
@@ -99,7 +157,7 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
       errors.to = 'The end date cannot be before the start date.';
     if (filter.from && filter.to) {
       const days = (Date.parse(filter.to) - Date.parse(filter.from)) / 86400000;
-      if (days > 366) errors.to = 'The date range cannot exceed 366 days.';
+      if (days >= 366) errors.to = 'The date range cannot exceed 366 days.';
     }
     const page = Number(filter.page);
     const pageSize = Number(filter.pageSize);
@@ -113,84 +171,73 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
     setError(null);
     setExportError(null);
     setExportSuccess(null);
+    const requestedFilter: ReportFilter = {
+      from: filter.from || undefined,
+      to: filter.to || undefined,
+      date: filter.date || undefined,
+      year: filter.year ? Number(filter.year) : undefined,
+      month: filter.month ? Number(filter.month) : undefined,
+      siteId: filter.siteId || undefined,
+      departmentId: filter.departmentId || undefined,
+      status: filter.status || undefined,
+      category: filter.category || undefined,
+      documentType: filter.documentType || undefined,
+      page,
+      pageSize,
+    };
+    const signal = lifetime();
     try {
-      const data = await fetchReport(
-        reportType,
-        {
-          from: filter.from || undefined,
-          to: filter.to || undefined,
-          date: filter.date || undefined,
-          year: filter.year ? Number(filter.year) : undefined,
-          month: filter.month ? Number(filter.month) : undefined,
-          siteId: filter.siteId || undefined,
-          departmentId: filter.departmentId || undefined,
-          status: filter.status || undefined,
-          category: filter.category || undefined,
-          documentType: filter.documentType || undefined,
-          page,
-          pageSize,
-        },
-        lifetime(),
-      );
-      if (!lifetime().aborted) setResult(data);
+      const data = await fetchExportableReport(reportType, requestedFilter, signal);
+      if (!signal.aborted) setResult({ ...data, requestedFilter: data.metadata.filter });
     } catch (failure) {
-      if (!lifetime().aborted) setError(errorMessage(failure));
+      if (!signal.aborted) setError(errorMessage(failure));
     } finally {
       inFlight.current = false;
-      if (!lifetime().aborted) setPending(false);
+      if (!signal.aborted) setPending(false);
     }
   }
 
   async function runExport(event: FormEvent) {
     event.preventDefault();
-    if (exporting || !reportType || !result) return;
+    if (exportInFlight.current || !canExport || !result) return;
     const errors: Record<string, string> = {};
     if (!exportReason.trim()) errors.reason = 'A reason is required for the audit record.';
     else if (exportReason.length > 1000)
       errors.reason = 'The reason must be at most 1000 characters.';
+    else if (!isValidReportExportReason(exportReason))
+      errors.reason = 'Enter the reason on one line without control characters.';
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
+    exportInFlight.current = true;
     setExporting(true);
     setExportError(null);
     setExportSuccess(null);
     const signal = lifetime();
     try {
-      const blob = await exportReport(
-        reportType,
+      const blob = await exportReportPage(
+        result.metadata.reportType,
         Number(exportFormat),
         exportReason.trim(),
-        {
-          from: filter.from || undefined,
-          to: filter.to || undefined,
-          date: filter.date || undefined,
-          year: filter.year ? Number(filter.year) : undefined,
-          month: filter.month ? Number(filter.month) : undefined,
-          siteId: filter.siteId || undefined,
-          departmentId: filter.departmentId || undefined,
-          status: filter.status || undefined,
-          category: filter.category || undefined,
-          documentType: filter.documentType || undefined,
-          page: Number(filter.page),
-          pageSize: Number(filter.pageSize),
-        },
+        result.requestedFilter,
         signal,
       );
       if (signal.aborted) return;
       const extension = exportFormat === '1' ? 'csv' : 'xlsx';
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${reportType}-${new Date().toISOString().slice(0, 10)}.${extension}`;
-      link.rel = 'noopener';
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      saveReportBlob(
+        blob,
+        `${result.metadata.reportType}-${new Date().toISOString().slice(0, 10)}.${extension}`,
+        signal,
+      );
       setExportSuccess(
-        `Exported ${result.metadata.totalCount} rows as ${extension.toUpperCase()}.`,
+        `${extension.toUpperCase()} download started for ${result.metadata.reportTitle}. ` +
+          `${reportPageContext(result.requestedFilter)}. ` +
+          `Preview returned ${result.rows.length} rows; the file records the export-time count.`,
       );
       setExportReason('');
     } catch (failure) {
       if (!signal.aborted) setExportError(errorMessage(failure));
     } finally {
+      exportInFlight.current = false;
       if (!signal.aborted) setExporting(false);
     }
   }
@@ -226,6 +273,7 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
             <SelectInput
               label="Report"
               required
+              disabled={pending || exporting}
               value={reportType}
               onChange={(event) => {
                 setReportType(event.target.value);
@@ -326,12 +374,16 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
             <div className="hr-repeat-heading">
               <h2>{result.metadata.reportTitle}</h2>
               <span className="hr-status hr-status--neutral">
-                {result.metadata.totalCount} rows &middot; {result.metadata.timeZone}
+                {result.rows.length} rows returned / {result.metadata.totalCount} matching &middot;{' '}
+                {result.metadata.timeZone}
               </span>
             </div>
             <p className="muted">
               Generated {new Date(result.metadata.generatedAtUtc).toLocaleString()} &middot;{' '}
               {result.metadata.sourceLockStatus}
+            </p>
+            <p className="muted" style={{ overflowWrap: 'anywhere' }}>
+              {reportPageContext(result.requestedFilter)}
             </p>
             <div className="hr-table-wrap">
               <table className="hr-table">
@@ -361,14 +413,12 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
           </div>
           {canExport && (
             <div className="hr-form-section">
-              <h2>Export</h2>
-              <p className="muted">
-                Exports are recorded with your reason for audit. A read-only grant cannot export.
-              </p>
+              <h2>Current-page export</h2>
               <form onSubmit={(event) => void runExport(event)}>
                 <div className="hr-form-grid">
                   <SelectInput
                     label="Format"
+                    disabled={exporting}
                     value={exportFormat}
                     onChange={(event) => setExportFormat(event.target.value)}
                     options={exportFormatOptions}
@@ -380,6 +430,7 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
                     rows={3}
                     required
                     maxLength={1000}
+                    disabled={exporting}
                     value={exportReason}
                     aria-invalid={Boolean(fieldErrors.reason)}
                     onChange={(event) => setExportReason(event.target.value)}
@@ -392,14 +443,14 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
                   </p>
                 )}
                 {exportSuccess && (
-                  <p className="hr-message" role="status">
+                  <p className="hr-message" role="status" style={{ overflowWrap: 'anywhere' }}>
                     {exportSuccess}
                   </p>
                 )}
                 <div className="hr-actions">
                   <Button type="submit" disabled={exporting || !result.rows.length}>
                     <FileSpreadsheet size={16} />
-                    {exporting ? 'Exporting...' : 'Export current view'}
+                    {exporting ? 'Exporting...' : 'Export preview page'}
                   </Button>
                 </div>
               </form>
@@ -407,7 +458,32 @@ function ReportWorkspace({ canExport }: { canExport: boolean }) {
           )}
         </>
       )}
+      {canExport && (
+        <HrReportExportJobs
+          subject={subject}
+          selection={
+            result
+              ? {
+                  reportType: result.metadata.reportType,
+                  title: result.metadata.reportTitle,
+                  filter: result.requestedFilter,
+                }
+              : null
+          }
+        />
+      )}
     </section>
+  );
+}
+
+function reportPageContext(filter: ReportFilter): string {
+  const requested = Object.entries(filter)
+    .filter(([key, value]) => key !== 'page' && key !== 'pageSize' && value !== undefined)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join('; ');
+  return (
+    `Page ${filter.page} (page size ${filter.pageSize}); requested filters: ` +
+    (requested || 'none specified; server defaults apply')
   );
 }
 

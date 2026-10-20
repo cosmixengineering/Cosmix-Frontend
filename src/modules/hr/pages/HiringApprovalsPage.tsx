@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
+import { Eye, KeyRound, RefreshCw, Search, UserRound } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
 import { SelectInput } from '@/components/forms/SelectInput';
 import { Pagination } from '@/components/data-display/Pagination';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -13,10 +15,29 @@ import { queryString } from '../api/hr-api';
 import { labelDate } from '../utils/messages';
 import { Denied, QueryState } from '../components/Feedback';
 import { HiringSubmissionReview } from '../components/approvals/HiringSubmissionReview';
+import '../components/approvals/hiring-review.css';
 
 export function HiringApprovalsPage() {
   const access = useHrAccess();
-  const [search, setSearch] = useState('');
+  const [params] = useSearchParams();
+  return (
+    <HiringQueue
+      key={JSON.stringify([
+        access.subject,
+        access.ready,
+        access.user?.grants,
+        params.get('search'),
+      ])}
+      initialSearch={params.get('search') ?? ''}
+    />
+  );
+}
+
+function HiringQueue({ initialSearch }: { initialSearch: string }) {
+  const access = useHrAccess();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/hr';
+  const [search, setSearch] = useState(initialSearch.slice(0, 100));
   const [status, setStatus] = useState('1');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<SubmissionSummary | null>(null);
@@ -31,12 +52,19 @@ export function HiringApprovalsPage() {
   );
   if (!access.can('hr.employees.read', 'hr.employees.submissions.review')) return <Denied />;
   return (
-    <>
+    <div className="hiring-queue">
       <div className="hr-page-heading">
         <div>
-          <p className="hr-kicker">HUMAN RESOURCES</p>
-          <h1>Hiring approvals</h1>
+          <p className="hr-kicker">EMPLOYEE ONBOARDING</p>
+          <h1>Hiring &amp; employee setup</h1>
         </div>
+        <Button
+          variant="secondary"
+          disabled={query.isFetching || !!selected}
+          onClick={() => void query.refetch()}
+        >
+          <RefreshCw size={16} /> Refresh
+        </Button>
       </div>
       {message && (
         <p role="status" className="hr-message">
@@ -89,7 +117,34 @@ export function HiringApprovalsPage() {
                 Revision {s.version} &middot; {labelDate(s.submittedAt)}
               </p>
             </div>
-            <span className="hr-status hr-status--neutral">{onboardingLabels[s.status]}</span>
+            <div className="hiring-row-actions">
+              <span className="hr-status hr-status--neutral">{onboardingLabels[s.status]}</span>
+              <Button
+                variant="secondary"
+                disabled={!access.can('hr.employees.documents.read')}
+                onClick={() => {
+                  setMessage('');
+                  setSelected(s);
+                }}
+              >
+                <Eye size={16} /> Review details
+              </Button>
+              {s.status === 2 && (
+                <>
+                  <Link className="button button--secondary" to={`${basePath}/employees/${s.employeeId}`}>
+                    <UserRound size={16} /> Employee details
+                  </Link>
+                  {access.can('access.accounts.read') && (
+                    <Link
+                      className="button button--secondary"
+                      to={`${basePath}/employees/${s.employeeId}?section=access`}
+                    >
+                      <KeyRound size={16} /> Roles &amp; software access
+                    </Link>
+                  )}
+                </>
+              )}
+            </div>
           </article>
         ))}
         {query.data && (
@@ -112,6 +167,7 @@ export function HiringApprovalsPage() {
           }
         }}
         title="Hiring submission"
+        className="hiring-review-dialog"
         description={selected ? `${selected.name ?? 'Employee'} · #${selected.employeeNumber}` : ''}
       >
         {selected && (
@@ -121,13 +177,14 @@ export function HiringApprovalsPage() {
             onDirty={setReviewDirty}
             onBusy={setReviewBusy}
             onSaved={(decision) => {
-              setSelected(null);
+              setReviewDirty(false);
               setMessage(`Hiring decision recorded: ${decision}.`);
+              setSelected(null);
               void query.refetch();
             }}
           />
         )}
       </Dialog>
-    </>
+    </div>
   );
 }

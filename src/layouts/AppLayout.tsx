@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -10,7 +10,6 @@ import {
   Calendar,
   Banknote,
   Coins,
-  Sliders,
   FileText,
   Bell,
   Search,
@@ -21,64 +20,12 @@ import {
   UserPlus,
   ShieldCheck,
   Tag,
-  Mail,
-  AlertTriangle,
-  ArrowRight,
   Car,
   Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/auth/use-auth';
 import logo from '@/assets/images/cosmix-logo.png';
 import '@/styles/hr-dashboard.css';
-
-interface NotificationItem {
-  id: string;
-  type: 'attendance' | 'leave' | 'hiring' | 'shift';
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-  link: string;
-}
-
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif-1',
-    type: 'attendance',
-    title: 'Biometric Geofence Exception',
-    body: 'Khurrianwala Site reported 3 punch attempts outside authorized boundary.',
-    time: '12 mins ago',
-    read: false,
-    link: '/hr/attendance',
-  },
-  {
-    id: 'notif-2',
-    type: 'leave',
-    title: 'New Leave Application',
-    body: 'Sara Ahmed submitted 1 day Medical Sick Leave with Rx attached.',
-    time: '45 mins ago',
-    read: false,
-    link: '/hr/leaves',
-  },
-  {
-    id: 'notif-3',
-    type: 'hiring',
-    title: 'Employee Draft Ready',
-    body: 'Draft #0021 requires CNIC and Emergency Contact before HR submission.',
-    time: '2 hours ago',
-    read: false,
-    link: '/hr/employees',
-  },
-  {
-    id: 'notif-4',
-    type: 'shift',
-    title: 'Site Night Overhaul Shift Active',
-    body: '14 technicians assigned to night overhaul shift in Faisalabad grid.',
-    time: 'Yesterday',
-    read: true,
-    link: '/hr/attendance/shifts',
-  },
-];
 
 export function AppLayout() {
   const { user, signOut } = useAuth();
@@ -101,47 +48,6 @@ export function AppLayout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Notifications State & Outside Click Handler
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-  const notificationRef = useRef<HTMLDivElement>(null);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const markAllAsRead = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const markOneAsRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    setNotificationsOpen(false);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
-        setNotificationsOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setNotificationsOpen(false);
-      }
-    };
-
-    if (notificationsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [notificationsOpen]);
 
   const displayName = user?.account?.displayName || 'Human Resources';
   const roleName = user?.grants.some((g) => g.permission.startsWith('access.'))
@@ -170,6 +76,15 @@ export function AppLayout() {
   // Dedicated single-active checker to prevent multiple simultaneous active links
   const isNavActive = (to: string, label: string): boolean => {
     const pathname = location.pathname;
+    const isLeaveWorkspace = [
+      '/hr/leaves',
+      '/hr/leave-management',
+      '/hr/leave-encashment',
+      '/hr/attendance/leaves',
+      '/hr/attendance/leave-settings',
+      '/hr/attendance/leave-benefits',
+      '/hr/attendance/recovery-work',
+    ].some((path) => pathname === path || pathname.startsWith(`${path}/`));
 
     if (label === 'Dashboard' || to === '/hr/dashboard') {
       return pathname === '/hr/dashboard' || pathname === '/hr' || pathname === '/hr/';
@@ -182,7 +97,11 @@ export function AppLayout() {
 
     // Attendance: Must NEVER match shifts!
     if (label === 'Attendance' || label === 'Attendance & Punches' || to === '/hr/attendance') {
-      if (pathname.startsWith('/hr/attendance/shifts') || pathname.startsWith('/hr/shifts')) {
+      if (
+        isLeaveWorkspace ||
+        pathname.startsWith('/hr/attendance/shifts') ||
+        pathname.startsWith('/hr/shifts')
+      ) {
         return false;
       }
       return pathname === '/hr/attendance' || pathname.startsWith('/hr/attendance/');
@@ -205,7 +124,7 @@ export function AppLayout() {
 
     // Leave & Absence:
     if (label === 'Leave & Absence' || to === '/hr/leaves') {
-      return pathname.startsWith('/hr/leaves') || pathname.startsWith('/hr/leave-management');
+      return isLeaveWorkspace;
     }
 
     // Overtime & Allowances:
@@ -291,11 +210,6 @@ export function AppLayout() {
       icon: Calendar,
     },
     {
-      to: '/hr/leave-encashment',
-      label: 'Leave Encashment',
-      icon: Banknote,
-    },
-    {
       to: '/hr/allowances',
       label: 'Overtime & Allowances',
       icon: Banknote,
@@ -314,16 +228,6 @@ export function AppLayout() {
       to: '/hr/payroll-handoff',
       label: 'Payroll Handoff',
       icon: Receipt,
-    },
-    {
-      to: '/hr/approval-routing',
-      label: 'Approval Routing',
-      icon: ShieldCheck,
-    },
-    {
-      to: '/hr/foundation-policies/fields',
-      label: 'Policy Configuration',
-      icon: Sliders,
     },
     {
       to: '/hr/reports/document-expiry',
@@ -547,111 +451,16 @@ export function AppLayout() {
               <Link to="/hr/attendance" className="hr-topbar-icon-btn" title="Attendance">
                 <Calendar size={14} />
               </Link>
-              <Link
-                to="/hr/workspaces/notifications-and-inbox"
-                className="hr-topbar-icon-btn"
-                title="Mail & Inbox"
-              >
-                <Mail size={14} />
-              </Link>
             </div>
 
-            {/* Notification Bell Toggle & Popover Window */}
-            <div className="hr-notification-wrapper" ref={notificationRef}>
-              <button
-                type="button"
-                className="hr-notification-bell"
-                onClick={() => setNotificationsOpen((prev) => !prev)}
-                aria-label={`${unreadCount} unread notifications`}
-                title="Notifications"
-                aria-expanded={notificationsOpen}
-              >
-                <Bell size={14} />
-                {unreadCount > 0 && <span className="hr-notification-counter">{unreadCount}</span>}
-              </button>
-
-              {notificationsOpen && (
-                <div
-                  className="hr-notification-dropdown"
-                  role="dialog"
-                  aria-label="Notifications panel"
-                >
-                  <div className="hr-noti-header">
-                    <div className="hr-noti-header-left">
-                      <h4 className="hr-noti-title">Notifications</h4>
-                      {unreadCount > 0 && <span className="hr-noti-badge">{unreadCount} New</span>}
-                    </div>
-                    {unreadCount > 0 && (
-                      <button type="button" className="hr-noti-mark-read" onClick={markAllAsRead}>
-                        Mark all read
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="hr-noti-list">
-                    {notifications.map((item) => (
-                      <Link
-                        key={item.id}
-                        to={item.link}
-                        className={`hr-noti-item ${!item.read ? 'unread' : ''}`}
-                        onClick={() => markOneAsRead(item.id)}
-                      >
-                        <div
-                          className="hr-noti-icon-wrap"
-                          style={{
-                            background:
-                              item.type === 'attendance'
-                                ? '#ffedd5'
-                                : item.type === 'leave'
-                                  ? '#eff6ff'
-                                  : item.type === 'hiring'
-                                    ? '#f5f3ff'
-                                    : '#f0fdf4',
-                            color:
-                              item.type === 'attendance'
-                                ? '#c2410c'
-                                : item.type === 'leave'
-                                  ? '#1d4ed8'
-                                  : item.type === 'hiring'
-                                    ? '#7c3aed'
-                                    : '#166534',
-                          }}
-                        >
-                          {item.type === 'attendance' && <AlertTriangle size={14} />}
-                          {item.type === 'leave' && <Calendar size={14} />}
-                          {item.type === 'hiring' && <Users size={14} />}
-                          {item.type === 'shift' && <Clock size={14} />}
-                        </div>
-
-                        <div className="hr-noti-content">
-                          <div className="hr-noti-item-title">
-                            <span>{item.title}</span>
-                            {!item.read && <span className="hr-noti-dot" />}
-                          </div>
-                          <p className="hr-noti-item-body">{item.body}</p>
-                          <div className="hr-noti-item-meta">
-                            <span className="hr-noti-tag">{item.type.toUpperCase()}</span>
-                            <span>•</span>
-                            <span>{item.time}</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-
-                  <div className="hr-noti-footer">
-                    <Link
-                      to="/hr/workspaces/notifications-and-inbox"
-                      className="hr-noti-view-all"
-                      onClick={() => setNotificationsOpen(false)}
-                    >
-                      <span>View All Notifications & Activity Logs</span>
-                      <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
+            <Link
+              to="/account/notifications"
+              className="hr-notification-bell"
+              aria-label="Open notifications"
+              title="Notifications"
+            >
+              <Bell size={14} />
+            </Link>
 
             {/* Current User Chip matching Image 2 */}
             <Link to="/account" className="hr-user-chip" style={{ textDecoration: 'none' }}>

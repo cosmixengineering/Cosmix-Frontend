@@ -102,3 +102,33 @@ were preserved. Do not reintroduce the cancelled feature from an older checklist
 
 See each feature README and `docs/HR-Gap-Continuation-Report-2026-10-13.md` for exact
 endpoints, verification and live acceptance limitations.
+
+## Admin hiring connection (15 October 2026)
+
+`/admin/approvals?type=hiring` now composes the same server-backed hiring queue as
+`/hr/approvals`. Fabricated Admin requests and local-only approve/reject handlers were
+removed. The queue exposes explicit review details and approved employee links.
+Review uses the retained submission, protected documents/sections, and current
+rowversion. Department/designation/category/office labels resolve from organization
+references. Effective taxonomy controls custom-category site placement; the existing
+OFFICE/SITE baseline remains available without taxonomy-read permission.
+
+Approval refreshes the queue after closing the review. From the Approved filter,
+Admin can continue to the existing site assignment and role/software access workspaces. Roles and scopes are
+explicit selections, not inferred grants from a job title. No backend, database,
+authentication or permission catalogue changes were made. See
+`docs/HR-Admin-Onboarding-2026-10-15.md` for checks and live-data limitations.
+
+## HR dashboard source summaries (19 October 2026)
+
+The dashboard reads `/hr/dashboard/attendance` and `/hr/dashboard/payroll` through
+the existing authenticated transport. Backend summaries select verified active
+employment and the current Karachi date. Turnout counts accepted session evidence;
+attendance classification coverage remains separate. Salary shows effective monthly
+gross by currency, missing/nonmonthly coverage and excluded future versions. Frozen
+handoff components for active employees are shown separately from base salary.
+
+These are read-only summaries behind existing All-scope source permissions. No local
+salary formula, fabricated attendance rate or payroll preparation runs in the browser.
+Each source has independent loading, error/retry and restricted states. CSV exports
+the same source dates, coverage and state as the visible dashboard.

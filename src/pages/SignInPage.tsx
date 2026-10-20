@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { Button } from '@/components/ui/Button';
 import { TextInput } from '@/components/forms/TextInput';
@@ -9,8 +9,9 @@ import { useAuth } from '@/auth/use-auth';
 import { authAdapter } from '@/auth/adapter';
 import { authErrorMessage } from '@/auth/messages';
 import { useChallengeTime } from '@/auth/ChallengeStatus';
-import type { OtpChallenge } from '@/auth/contracts';
+import { type OtpChallenge, isSystemAdmin } from '@/auth/contracts';
 import { LocalTestOtp } from '@/auth/LocalTestOtp';
+import logo from '@/assets/images/cosmix-logo.png';
 
 export function SignInPage() {
   const { user, status, sessionError, completeSignIn, retrySession } = useAuth();
@@ -67,50 +68,60 @@ export function SignInPage() {
     }
   }
 
-  const isAdmin = Boolean(
-    user?.grants.some(
-      (g: { permission: string }) =>
-        g.permission === 'hr.organization.manage' ||
-        g.permission === 'hr.employees.submissions.review' ||
-        g.permission.startsWith('admin.'),
-    ),
-  );
+  const isAdmin = isSystemAdmin(user);
   if (status === 'authenticated') {
     return <Navigate to={isAdmin ? '/admin/dashboard' : '/hr/dashboard'} replace />;
   }
   const loading = status === 'loading';
   return (
-    <AuthLayout>
+    <AuthLayout variant="split">
       <section className="auth-content" aria-labelledby="sign-in-title">
-        <div className="auth-eyebrow">COSMIX WORKSPACE</div>
+        <div className="auth-form-brand">
+          <img src={logo} alt="Cosmix Engineering" width="192" height="80" />
+        </div>
         <h1 id="sign-in-title">
-          {verified ? 'Finishing sign in' : challenge ? 'Verify your identity' : 'Sign in'}
+          {verified
+            ? loading
+              ? 'Finishing sign in'
+              : 'Sign-in interrupted'
+            : challenge
+              ? 'Verify your identity'
+              : 'Sign in'}
         </h1>
         <p className="auth-subtitle">
           {verified
-            ? 'Loading your account.'
+            ? loading
+              ? 'Loading your account.'
+              : 'Your account session could not be confirmed.'
             : challenge
               ? 'If your details are eligible, a code will arrive on your registered mobile number.'
               : 'Welcome back to Cosmix Engineering.'}
         </p>
-        <ol className="auth-steps" aria-label="Sign-in progress">
-          <li aria-current={!challenge && !verified ? 'step' : undefined}>
-            <span>{challenge || verified ? <Check size={13} /> : '1'}</span> Account
-          </li>
-          <li aria-current={challenge || verified ? 'step' : undefined}>
-            <span>2</span> Verification
-          </li>
-        </ol>
         {(error || (!challenge && sessionError)) && (
           <div className="auth-message auth-message--error" role="alert">
             {error || sessionError}
           </div>
         )}
         {verified ? (
-          <Button className="auth-submit" disabled={loading} onClick={() => void retrySession()}>
-            <LoaderCircle size={17} className={loading ? 'spin' : undefined} />
-            {loading ? 'Loading account...' : 'Retry account access'}
-          </Button>
+          <>
+            <Button className="auth-submit" disabled={loading} onClick={() => void retrySession()}>
+              <LoaderCircle size={17} className={loading ? 'spin' : undefined} />
+              {loading ? 'Loading account...' : 'Retry account access'}
+            </Button>
+            <Button
+              variant="ghost"
+              className="auth-back"
+              disabled={loading}
+              onClick={() => {
+                setVerified(false);
+                setChallenge(null);
+                setResending(false);
+                setError(null);
+              }}
+            >
+              <ArrowLeft size={15} /> Back to sign in
+            </Button>
+          </>
         ) : (
           <form
             onSubmit={(event) => void submit(event)}
@@ -179,18 +190,6 @@ export function SignInPage() {
                       key={`local-otp:${challenge.challengeId}`}
                       challengeId={challenge.challengeId}
                     />
-                  )}
-                  {verified && !loading && (
-                    <Button
-                      variant="ghost"
-                      className="auth-back"
-                      onClick={() => {
-                        setVerified(false);
-                        setError(null);
-                      }}
-                    >
-                      <ArrowLeft size={15} /> Back to sign in
-                    </Button>
                   )}
                 </>
               )}
