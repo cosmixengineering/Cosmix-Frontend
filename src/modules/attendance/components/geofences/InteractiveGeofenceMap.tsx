@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Building2, Crosshair, Minus, Plus } from 'lucide-react';
+import { getGoogleTileUrl } from '@/utils/google-maps';
 
 export interface InteractiveGeofenceMapProps {
   latitude: number;
@@ -150,12 +151,7 @@ export function InteractiveGeofenceMap({
       const txNorm = ((tx % (maxIndex + 1)) + (maxIndex + 1)) % (maxIndex + 1);
       const left = Math.round(tx * 256 - (centerPixel.x - size.width / 2));
       const top = Math.round(ty * 256 - (centerPixel.y - size.height / 2));
-      let url = '';
-      if (layer === 'roads') {
-        url = `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${txNorm}/${ty}.png`;
-      } else {
-        url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${txNorm}`;
-      }
+      const url = getGoogleTileUrl(layer === 'roads' ? 'roadmap' : 'hybrid', txNorm, ty, zoom);
       tiles.push({ key: `${zoom}-${txNorm}-${ty}-${layer}`, left, top, url });
     }
   }
@@ -233,11 +229,11 @@ export function InteractiveGeofenceMap({
               pointerEvents: 'none',
             }}
             onError={(e) => {
-              // Fallback to OpenStreetMap if Carto Voyager fails
+              // Retry loading Google tile once if temporary network issue
               const target = e.currentTarget;
-              if (layer === 'roads' && !target.src.includes('tile.openstreetmap.org')) {
-                const parts = tile.key.split('-');
-                target.src = `https://tile.openstreetmap.org/${parts[0]}/${parts[1]}/${parts[2]}.png`;
+              if (!target.dataset.retried) {
+                target.dataset.retried = 'true';
+                target.src = tile.url;
               }
             }}
           />
@@ -295,9 +291,7 @@ export function InteractiveGeofenceMap({
         </div>
 
         {/* Map Attribution Tag */}
-        <div className="map-attribution-badge">
-          {layer === 'roads' ? '© OpenStreetMap, CartoDB' : '© Esri, Maxar, Earthstar'}
-        </div>
+        <div className="map-attribution-badge">© Google Maps</div>
       </div>
 
       {/* Radius Presets and Quick Controls */}

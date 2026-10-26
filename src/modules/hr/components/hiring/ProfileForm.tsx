@@ -689,9 +689,9 @@ export function ProfileForm({
               <div>
                 <strong>Site Staff Deployment Mode Activated:</strong>
                 <p style={{ margin: '4px 0 0' }}>
-                  Is employee ka koi office branch nahi hoga. Profile submit hone k baad{' '}
-                  <strong>Admin Dashboard</strong> se isko active site boundaries, GPS geofencing
-                  aur site supervisor roster assign kiye jaayenge.
+                  This employee will not be assigned to a physical office branch. After profile
+                  submission, active site boundaries, GPS geofencing, and site supervisor rosters
+                  will be assigned from the <strong>Admin Dashboard</strong>.
                 </p>
               </div>
             </div>

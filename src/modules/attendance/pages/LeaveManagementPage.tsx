@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, ClipboardList, Gift, Receipt, Settings } from 'lucide-react';
+import { Building2, ClipboardCheck, ClipboardList, Gift, Receipt, Settings } from 'lucide-react';
 import { z } from 'zod';
 import { Pagination } from '@/components/data-display/Pagination';
 import { TextInput } from '@/components/forms/TextInput';
@@ -8,12 +8,16 @@ import { Denied, PrivateWorkspace, QueryState } from '../components/SchedulingUi
 import { queryString } from '../api/attendance-api';
 import { useAttendanceAccess } from '../hooks/use-attendance-access';
 import { useAttendanceQuery } from '../hooks/use-attendance-query';
-import { LeaveAdminPage } from '../operations/leave-policy/LeavePages';
 import { Reload } from '../operations/leave-policy/Ui';
-import { supportedScopes } from '../operations/review/access';
+import { canEmployee, supportedScopes, type Scope } from '../operations/review/access';
 import { EmployeeWorkspace } from '../operations/review/ReviewUi';
 import { date, id, pageOf } from '../schemas/common';
 import { businessToday } from '../utils/messages';
+import '@/styles/leave-management.css';
+
+const LeaveAdminPage = lazy(() =>
+  import('../operations/leave-policy').then((module) => ({ default: module.LeaveAdminPage })),
+);
 
 const calendarPermission = 'attendance.leaves.team-calendar.read';
 const calendarStatus = z.enum([
@@ -46,65 +50,77 @@ export function LeaveManagementPage() {
 
 function ManagementWorkspace() {
   const access = useAttendanceAccess();
-  const canReadCalendar = supportedScopes(access.user, calendarPermission).length > 0;
+  const canReadCalendar =
+    access.ready && supportedScopes(access.user, calendarPermission).length > 0;
   const canReview = access.can('attendance.leaves.review');
   const canConfigure = access.can('attendance.leaves.configure');
   const canReviewBenefits = access.can('attendance.leaves.benefits.review');
-
   return (
-    <>
-      <nav className="attendance-commands" aria-label="Leave management">
-        {canReadCalendar && canReview && (
-          <Link className="button button--secondary" to="/hr/attendance/leaves">
-            <ClipboardList size={16} aria-hidden="true" />
-            Review employee requests
-          </Link>
-        )}
-        {canConfigure && (
-          <Link className="button button--secondary" to="/hr/attendance/leave-settings">
-            <Settings size={16} aria-hidden="true" />
-            Leave settings
-          </Link>
-        )}
-        {canReview && (
-          <Link className="button button--secondary" to="/hr/leave-encashment">
-            <Receipt size={16} aria-hidden="true" />
-            Encashment review
-          </Link>
-        )}
-        {canReviewBenefits && (
-          <Link className="button button--secondary" to="/hr/attendance/leave-benefits">
-            <Gift size={16} aria-hidden="true" />
-            Leave benefits
-          </Link>
-        )}
-        {canReview && (
-          <Link className="button button--secondary" to="/hr/attendance/recovery-work">
-            <ClipboardCheck size={16} aria-hidden="true" />
-            Recovery work review
-          </Link>
-        )}
-      </nav>
+    <div className="leave-v4-shell">
+      <div className="leave-v4-header">
+        <div>
+          <div className="leave-v4-title-row">
+            <h1 className="leave-v4-title">Leave Management &amp; Approvals</h1>
+            <span className="leave-v4-breadcrumb">
+              <Building2 size={12} /> Human Resources
+            </span>
+          </div>
+          <p className="leave-v4-sub">
+            View recorded employee leave dates and review permitted requests using current server
+            records and approval evidence.
+          </p>
+        </div>
+        <div className="leave-v4-nav-links">
+          {canReadCalendar && canReview && (
+            <Link to="/hr/attendance/leaves" className="leave-v4-btn-nav">
+              <ClipboardList size={12} /> Review employee requests
+            </Link>
+          )}
+          {canConfigure && (
+            <Link to="/hr/attendance/leave-settings" className="leave-v4-btn-nav">
+              <Settings size={12} /> Leave Settings
+            </Link>
+          )}
+          {canReview && (
+            <Link to="/hr/leave-encashment" className="leave-v4-btn-nav">
+              <Receipt size={12} /> Encashment Review
+            </Link>
+          )}
+          {canReviewBenefits && (
+            <Link to="/hr/attendance/leave-benefits" className="leave-v4-btn-nav">
+              <Gift size={12} /> Leave benefits
+            </Link>
+          )}
+          {canReview && (
+            <Link to="/hr/attendance/recovery-work" className="leave-v4-btn-nav">
+              <ClipboardCheck size={12} /> Recovery work review
+            </Link>
+          )}
+        </div>
+      </div>
       {canReadCalendar ? (
         <EmployeeWorkspace permission={calendarPermission} title="Employee leave calendar">
-          {(employeeId) => <EmployeeCalendar key={employeeId} employeeId={employeeId} />}
+          {(employeeId, scope) => (
+            <EmployeeCalendar key={employeeId} employeeId={employeeId} scope={scope} />
+          )}
         </EmployeeWorkspace>
       ) : canReview ? (
-        <LeaveAdminPage />
+        <Suspense fallback={<p role="status">Loading leave review...</p>}>
+          <LeaveAdminPage />
+        </Suspense>
       ) : (
-        <>
-          <h1>Leave &amp; Absence</h1>
-          <Denied>Employee leave access has not been assigned to this account.</Denied>
-        </>
+        <Denied>Employee leave access has not been assigned to this account.</Denied>
       )}
-    </>
+    </div>
   );
 }
 
-function EmployeeCalendar({ employeeId }: { employeeId: string }) {
+function EmployeeCalendar({ employeeId, scope }: { employeeId: string; scope?: Scope }) {
+  const access = useAttendanceAccess();
   const [from, setFrom] = useState(() => businessToday().slice(0, 8) + '01');
   const [to, setTo] = useState(businessToday);
   const [page, setPage] = useState(1);
+  const allowed = access.ready && canEmployee(access.user, calendarPermission, employeeId, scope);
   const rangeValid =
     date.safeParse(from).success &&
     date.safeParse(to).success &&
@@ -115,10 +131,19 @@ function EmployeeCalendar({ employeeId }: { employeeId: string }) {
   const query = useAttendanceQuery(
     '/leaves/team-calendar' +
       queryString({ employeeIds: employeeId, from, to, page, pageSize: 25 }),
-    calendarPage,
-    rangeValid,
+    calendarPage.refine(
+      (value) =>
+        value.items.every(
+          (entry) =>
+            entry.employeeId.toLowerCase() === employeeId.toLowerCase() &&
+            entry.date >= from &&
+            entry.date <= to,
+        ),
+      'Calendar records do not match the selected employee and dates.',
+    ),
+    allowed && rangeValid,
   );
-
+  if (!allowed) return <Denied>Matching employee leave calendar access is required.</Denied>;
   return (
     <section className="attendance-section" aria-label="Employee leave dates">
       <div className="attendance-grid">

@@ -1,339 +1,290 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FilePenLine, FileText, Filter, RefreshCw } from 'lucide-react';
-import { TextInput } from '@/components/forms/TextInput';
-import { Command, Denied, PrivateWorkspace, QueryState } from '../components/SchedulingUi';
+import { Building2, Calendar, Clock, RefreshCw, Search, Users } from 'lucide-react';
+import { Pagination } from '@/components/data-display/Pagination';
+import { useHrQuery } from '@/modules/hr/hooks/use-hr-queries';
+import { useHrAccess } from '@/modules/hr/hooks/use-hr-access';
+import { employeeArchivePageSchema } from '@/modules/hr/components/employee/employee-archive-directory';
 import { useAttendanceAccess } from '../hooks/use-attendance-access';
 import { useAttendanceQuery } from '../hooks/use-attendance-query';
+import { queryString } from '../api/attendance-api';
 import { hasReportGrant } from '../operations/reports/access';
-import {
-  dashboardFor,
-  factualBatchFor,
-  reportQuery,
-  reportSelection,
-  type ReportSelection,
-} from '../operations/reports/schemas';
+import { factualBatchFor } from '../operations/reports/schemas';
+import { Denied, QueryState } from '../components/SchedulingUi';
 import { businessToday } from '../utils/messages';
+import '@/styles/attendance-processing.css';
 
-const evidenceLabels = {
-  closed_session_evidence: 'Closed session evidence',
-  open_session: 'Open session',
-  no_accepted_session_evidence: 'No accepted session evidence',
-} as const;
-
-function FactualResults({ selection }: { selection: ReportSelection }) {
+// Factual session evidence is not an approved presence, lateness, leave or pay calculation.
+export function AttendanceProcessingPage() {
   const access = useAttendanceAccess();
+  const hrAccess = useHrAccess();
   const allowed = hasReportGrant(access.user, 'attendance.reports.read');
-  const canCorrect = hasReportGrant(access.user, 'attendance.corrections.submit');
-  const [view, setView] = useState<'register' | 'totals'>('register');
-  const filter = reportQuery(selection);
-  const register = useAttendanceQuery(
-    '/attendance/reports/factual/batch' + filter,
-    factualBatchFor(selection),
-    allowed && view === 'register',
+  const today = businessToday();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [view, setView] = useState<'matrix' | 'evidence'>('matrix');
+  const [selectedDay, setSelectedDay] = useState(today);
+  const monthStart = today.slice(0, 8) + '01';
+  const directory = useHrQuery(
+    'employees' + queryString({ page, pageSize: 25 }),
+    employeeArchivePageSchema,
+    ['hr.employees.read'],
+    allowed,
   );
-  const dashboard = useAttendanceQuery(
-    '/attendance/reports/dashboard' + filter,
-    dashboardFor(selection),
-    allowed && view === 'totals',
+  const employees = useMemo(
+    () => (!directory.isError ? (directory.data?.items ?? []) : []),
+    [directory.data, directory.isError],
   );
-  const current = view === 'register' ? register : dashboard;
-  // A failed or refreshing request must not present retained rows as current evidence.
-  const metadata = current.isSuccess && !current.isFetching ? current.data.metadata : null;
-  const batch = register.isSuccess && !register.isFetching ? register.data : null;
-  const totals = dashboard.isSuccess && !dashboard.isFetching ? dashboard.data.totals : null;
-  if (!allowed) return <Denied>Factual attendance report access is unavailable.</Denied>;
+  const employeeIds = useMemo(() => employees.map((employee) => employee.id), [employees]);
+  const path = useMemo(() => {
+    const params = new URLSearchParams({ from: monthStart, to: today });
+    employeeIds.forEach((id) => params.append('employeeIds', id));
+    return '/attendance/reports/factual/batch?' + params.toString();
+  }, [monthStart, today, employeeIds]);
+  const factual = useAttendanceQuery(
+    path,
+    factualBatchFor({ employeeIds, from: monthStart, to: today }),
+    allowed && employeeIds.length > 0,
+  );
+  const rows = !factual.isError ? (factual.data?.rows ?? []) : [];
+  const loaded = Boolean(
+    !directory.isError &&
+    !directory.isPending &&
+    !factual.isError &&
+    !factual.isPending &&
+    factual.data,
+  );
+  const filtered = employees.filter(
+    (employee) =>
+      !search.trim() ||
+      `${employee.name ?? ''} ${employee.employeeNumber}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()),
+  );
+  const days = Array.from(
+    { length: new Date(`${today}T00:00:00Z`).getUTCDate() },
+    (_, index) => `${today.slice(0, 8)}${String(index + 1).padStart(2, '0')}`,
+  );
+  const dayRows = rows.filter(
+    (row) =>
+      row.businessDate === selectedDay &&
+      filtered.some((employee) => employee.id === row.employeeId),
+  );
+  const evidenceDays = rows.filter((row) => row.sessionCount > 0).length;
+  const workedMinutes = rows.reduce((sum, row) => sum + row.workedMinutes, 0);
+  const exceptions = rows.reduce((sum, row) => sum + row.exceptionCount, 0);
+
+  function refresh() {
+    void directory.refetch();
+    if (employeeIds.length) void factual.refetch();
+  }
+  if (!access.ready || !hrAccess.ready)
+    return <p role="status">Loading authenticated attendance access...</p>;
+  if (!allowed || !hrAccess.can('hr.employees.read'))
+    return <Denied>Attendance reports and employee directory access are required.</Denied>;
 
   return (
-    <section className="attendance-section" aria-label="Factual attendance results">
-      <div className="attendance-heading">
-        <h2>Factual attendance</h2>
-        <div className="attendance-commands">
-          <Command
-            icon={RefreshCw}
-            variant="secondary"
-            disabled={current.isFetching}
-            onClick={() => void current.refetch()}
-          >
-            Reload
-          </Command>
+    <div className="att-v4-shell">
+      <div className="att-v4-header">
+        <div className="att-v4-title-row">
+          <h1 className="att-v4-title">Attendance &amp; Time-Tracking</h1>
+          <span className="att-v4-breadcrumb">
+            <Building2 size={13} />
+            Human Resources
+          </span>
         </div>
+        <button
+          type="button"
+          className="att-v4-btn-action"
+          disabled={directory.isFetching || factual.isFetching}
+          onClick={refresh}
+        >
+          <RefreshCw size={14} /> Refresh records
+        </button>
       </div>
-      <div className="attendance-tabs" role="tablist" aria-label="Factual attendance view">
-        {(['register', 'totals'] as const).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            role="tab"
-            id={'attendance-processing-tab-' + mode}
-            aria-controls="attendance-processing-results"
-            aria-selected={view === mode}
-            tabIndex={view === mode ? 0 : -1}
-            onClick={() => setView(mode)}
-            onKeyDown={(event) => {
-              const next =
-                event.key === 'Home'
-                  ? 'register'
-                  : event.key === 'End'
-                    ? 'totals'
-                    : event.key === 'ArrowLeft' || event.key === 'ArrowRight'
-                      ? mode === 'register'
-                        ? 'totals'
-                        : 'register'
-                      : null;
-              if (!next) return;
-              event.preventDefault();
-              setView(next);
-              document.getElementById('attendance-processing-tab-' + next)?.focus();
-            }}
-          >
-            {mode === 'register' ? 'Register' : 'Totals'}
-          </button>
+      <p className="hr-notice">
+        Factual attendance for {monthStart} to {today}, covering this directory page only (up to 25
+        employees). Session evidence does not establish lateness, absence, leave entitlement,
+        overtime or deductions. Use the approved review workflows for changes.
+      </p>
+      <div className="att-v4-kpis-grid">
+        {[
+          { label: 'Employees in this selection', value: employees.length, Icon: Users },
+          { label: 'Days with session evidence', value: evidenceDays, Icon: Calendar },
+          { label: 'Recorded worked minutes', value: workedMinutes, Icon: Clock },
+          { label: 'Recorded exceptions', value: exceptions, Icon: Building2 },
+        ].map(({ label, value, Icon }) => (
+          <div className="att-v4-kpi-card" key={label}>
+            <div className="att-v4-kpi-left">
+              <span className="att-v4-kpi-label">{label}</span>
+              <div className="att-v4-kpi-val">{loaded ? value : '—'}</div>
+              <span className="att-v4-kpi-sub">Selected employees and dates</span>
+            </div>
+            <div className="att-v4-kpi-icon-box">
+              <Icon size={18} />
+            </div>
+          </div>
         ))}
       </div>
-      <div
-        id="attendance-processing-results"
-        role="tabpanel"
-        aria-labelledby={'attendance-processing-tab-' + view}
-        tabIndex={0}
-      >
-        <QueryState query={current} />
-        {metadata && (
-          <dl className="attendance-record">
-            <dt>Business date</dt>
-            <dd>{metadata.from}</dd>
-            <dt>Business timezone</dt>
-            <dd>{metadata.timeZone}</dd>
-            <dt>Coverage</dt>
-            <dd>{metadata.employeeIds.length} selected employees</dd>
-            <dt>Generated UTC</dt>
-            <dd>{metadata.generatedAtUtc}</dd>
-            <dt>Lock state</dt>
-            <dd>
-              {
-                { all_locked: 'All locked', all_unlocked: 'All unlocked', mixed: 'Mixed' }[
-                  metadata.lockStatus
-                ]
-              }
-            </dd>
-            <dt>Policy status</dt>
-            <dd>Factual evidence only; payroll calculation unavailable</dd>
-          </dl>
-        )}
-        {view === 'register' && batch && !current.isError && (
-          <>
-            {batch.rows.every((row) => row.factualStatus === 'no_accepted_session_evidence') && (
-              <p className="attendance-empty" role="status">
-                No accepted session evidence for this selection.
-              </p>
-            )}
-            <div className="hr-table-scroll">
-              <table className="attendance-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Employee ID</th>
-                    <th scope="col">Evidence status</th>
-                    <th scope="col">Closed worked minutes</th>
-                    <th scope="col">Sessions / open</th>
-                    <th scope="col">Exceptions</th>
-                    <th scope="col">Lock / saved summary</th>
-                    {canCorrect && <th scope="col">Corrections</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {batch.rows.map((row) => (
-                    <tr key={row.employeeId + ':' + row.businessDate}>
-                      <th scope="row" style={{ overflowWrap: 'anywhere' }}>
-                        <Link to={'/hr/attendance/employees/' + row.employeeId}>
-                          {row.employeeId}
-                        </Link>
-                      </th>
-                      <td>{evidenceLabels[row.factualStatus]}</td>
-                      <td>{row.workedMinutes}</td>
-                      <td>
-                        {row.sessionCount} / {row.openSessions}
-                      </td>
-                      <td>{row.exceptionCount}</td>
-                      <td>
-                        {row.isLocked ? 'Locked' : 'Unlocked'}
-                        <br />
-                        {row.summaryRevision === null
-                          ? 'No current saved summary'
-                          : 'Revision ' + row.summaryRevision}
-                      </td>
-                      {canCorrect && (
-                        <td>
-                          <Link to={'/hr/attendance/employees/' + row.employeeId + '/corrections'}>
-                            Corrections
-                          </Link>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-        {view === 'totals' && totals && !current.isError && (
-          <>
-            {totals.noAcceptedSessionEvidenceDays === totals.employeeDays && (
-              <p className="attendance-empty" role="status">
-                No accepted session evidence for this selection.
-              </p>
-            )}
-            <dl className="attendance-record">
-              <dt>Employee days</dt>
-              <dd>{totals.employeeDays}</dd>
-              <dt>Closed session evidence days</dt>
-              <dd>{totals.closedSessionEvidenceDays}</dd>
-              <dt>Open session days</dt>
-              <dd>{totals.openSessionDays}</dd>
-              <dt>No accepted session evidence days</dt>
-              <dd>{totals.noAcceptedSessionEvidenceDays}</dd>
-              <dt>Closed worked seconds</dt>
-              <dd>{totals.workedSeconds}</dd>
-              <dt>Sum of daily worked minutes</dt>
-              <dd>{totals.sumDailyWorkedMinutes}</dd>
-              <dt>Closed sessions</dt>
-              <dd>{totals.closedSessions}</dd>
-              <dt>Open sessions</dt>
-              <dd>{totals.openSessions}</dd>
-              <dt>Exceptions</dt>
-              <dd>{totals.exceptionCount}</dd>
-              <dt>Days with exceptions</dt>
-              <dd>{totals.daysWithExceptions}</dd>
-              <dt>Locked / unlocked days</dt>
-              <dd>
-                {totals.lockedDays} / {totals.unlockedDays}
-              </dd>
-              <dt>Current saved summary days</dt>
-              <dd>{totals.currentSavedSummaryDays}</dd>
-              <dt>Unsaved or stale summary days</dt>
-              <dd>{totals.unsavedOrStaleSummaryDays}</dd>
-            </dl>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function ProcessingContent() {
-  const access = useAttendanceAccess();
-  const canRead = hasReportGrant(access.user, 'attendance.reports.read');
-  const canExport = hasReportGrant(access.user, 'attendance.reports.export');
-  const canCorrect = hasReportGrant(access.user, 'attendance.corrections.submit');
-  const canReview = hasReportGrant(access.user, 'attendance.corrections.review');
-  const [employees, setEmployees] = useState('');
-  const [businessDate, setBusinessDate] = useState(() => businessToday());
-  const [selection, setSelection] = useState<ReportSelection | null>(null);
-  const [validation, setValidation] = useState('');
-
-  function load() {
-    const result = reportSelection.safeParse({
-      employeeIds: employees
-        .trim()
-        .split(/[\s,]+/)
-        .filter(Boolean),
-      from: businessDate,
-      to: businessDate,
-    });
-    if (!result.success) {
-      setSelection(null);
-      setValidation('A valid business date and 1-25 unique employee IDs are required.');
-      return;
-    }
-    setValidation('');
-    setSelection(result.data);
-  }
-
-  return (
-    <>
-      <div className="attendance-heading">
-        <h1>Attendance Processing</h1>
-        <nav className="attendance-commands" aria-label="Attendance workspaces">
-          {canCorrect && (
-            <Link to="/hr/attendance/corrections">
-              <FilePenLine size={16} aria-hidden="true" /> Corrections
-            </Link>
-          )}
-          {canReview && (
-            <Link to="/hr/attendance/corrections/review">
-              <FileText size={16} aria-hidden="true" /> Correction review
-            </Link>
-          )}
-          {(canRead || canExport) && (
-            <Link to="/hr/attendance/reports">
-              <FileText size={16} aria-hidden="true" /> Reports{canExport ? ' and exports' : ''}
-            </Link>
-          )}
-        </nav>
-      </div>
-      {!canRead ? (
-        <Denied>Factual attendance report access is unavailable.</Denied>
-      ) : (
-        <>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              load();
-            }}
+      <div className="att-v4-header">
+        <div className="att-v4-tabs" role="tablist" aria-label="Attendance evidence views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'matrix'}
+            onClick={() => setView('matrix')}
           >
-            <div className="attendance-grid">
-              <TextInput
-                label="Business date (Asia/Karachi)"
+            Monthly evidence
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'evidence'}
+            onClick={() => setView('evidence')}
+          >
+            Daily evidence
+          </button>
+        </div>
+        <Link to="/hr/attendance/corrections" className="att-v4-btn-action">
+          Attendance corrections
+        </Link>
+      </div>
+      <label>
+        <Search size={14} /> Search this page
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Name or employee number"
+        />
+      </label>
+      <QueryState
+        query={directory}
+        empty={!employees.length}
+        emptyText="No employees returned for this page."
+      />
+      {employees.length > 0 && <QueryState query={factual} />}
+      {loaded && !filtered.length && <p role="status">No employees match this page's search.</p>}
+      {loaded &&
+        filtered.length > 0 &&
+        (view === 'matrix' ? (
+          <div style={{ overflowX: 'auto' }}>
+            <p>
+              C = closed session evidence; O = open session; N = no accepted session evidence. N
+              does not mean absent.
+            </p>
+            <table className="att-v4-matrix-table">
+              <thead>
+                <tr>
+                  <th className="col-employee">Employee</th>
+                  {days.map((day) => (
+                    <th key={day} className="col-day">
+                      {day.slice(8)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((employee) => (
+                  <tr key={employee.id}>
+                    <td className="col-employee">
+                      <div className="att-emp-card">
+                        <div className="att-emp-info">
+                          <span className="att-emp-name">
+                            {employee.name ?? 'Name unavailable'}
+                          </span>
+                          <span className="att-emp-sub">Employee #{employee.employeeNumber}</span>
+                        </div>
+                      </div>
+                    </td>
+                    {days.map((day) => {
+                      const row = rows.find(
+                        (item) => item.employeeId === employee.id && item.businessDate === day,
+                      );
+                      const code =
+                        row?.factualStatus === 'closed_session_evidence'
+                          ? 'C'
+                          : row?.factualStatus === 'open_session'
+                            ? 'O'
+                            : row?.factualStatus === 'no_accepted_session_evidence'
+                              ? 'N'
+                              : '—';
+                      return (
+                        <td
+                          key={day}
+                          className="col-day"
+                          title={
+                            row
+                              ? `${row.workedMinutes} worked minutes; ${row.exceptionCount} exceptions`
+                              : 'No returned evidence'
+                          }
+                        >
+                          <span className="att-badge dash">{code}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <section>
+            <label>
+              Evidence date
+              <input
                 type="date"
-                value={businessDate}
-                required
-                onChange={(event) => {
-                  setBusinessDate(event.target.value);
-                  setSelection(null);
-                  setValidation('');
-                }}
+                min={monthStart}
+                max={today}
+                value={selectedDay}
+                onChange={(event) => setSelectedDay(event.target.value)}
               />
-              <label className="field">
-                Employee IDs (1-25)
-                <textarea
-                  value={employees}
-                  maxLength={2000}
-                  rows={3}
-                  required
-                  spellCheck={false}
-                  onChange={(event) => {
-                    setEmployees(event.target.value);
-                    setSelection(null);
-                    setValidation('');
-                  }}
-                />
-              </label>
-            </div>
-            <Command icon={Filter} type="submit">
-              Load attendance
-            </Command>
-          </form>
-          {validation && (
-            <p className="attendance-error" role="alert">
-              {validation}
-            </p>
-          )}
-          {selection ? (
-            <FactualResults key={reportQuery(selection)} selection={selection} />
-          ) : (
-            <p className="attendance-empty" role="status">
-              No employee/date selection loaded.
-            </p>
-          )}
-        </>
+            </label>
+            {!dayRows.length ? (
+              <p role="status">No factual records returned for the selected date and employees.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="att-v4-matrix-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Evidence</th>
+                      <th>Worked minutes</th>
+                      <th>Sessions</th>
+                      <th>Open sessions</th>
+                      <th>Exceptions</th>
+                      <th>Month closure</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dayRows.map((row) => (
+                      <tr key={row.employeeId}>
+                        <td>
+                          {employees.find((employee) => employee.id === row.employeeId)?.name ??
+                            row.employeeId}
+                        </td>
+                        <td>{row.factualStatus.replaceAll('_', ' ')}</td>
+                        <td>{row.workedMinutes}</td>
+                        <td>{row.sessionCount}</td>
+                        <td>{row.openSessions}</td>
+                        <td>{row.exceptionCount}</td>
+                        <td>{row.isLocked ? 'Locked' : 'Unlocked'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ))}
+      {directory.data && !directory.isError && (
+        <Pagination
+          page={page}
+          pageSize={25}
+          total={directory.data.totalCount}
+          disabled={directory.isFetching || factual.isFetching}
+          onChange={setPage}
+        />
       )}
-    </>
-  );
-}
-
-export function AttendanceProcessingPage() {
-  return (
-    <PrivateWorkspace resource="attendance-processing">
-      <ProcessingContent />
-    </PrivateWorkspace>
+    </div>
   );
 }
