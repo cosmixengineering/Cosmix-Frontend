@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/auth/use-auth';
+import { SelectInput } from '@/components/forms/SelectInput';
 import { OutstationWorkspace } from '../outstation/OutstationWorkspace';
 import { canDeployment } from '../outstation/contracts';
 import { Denied, ActionMessage } from '../components/Feedback';
@@ -211,7 +212,7 @@ function AllowancesContent() {
                 className={`allowance-tab-btn ${isActive ? 'active' : ''}`}
                 onClick={() => setTab(t.id)}
               >
-                <Icon size={14} />
+                <Icon size={13} />
                 <span>{t.label}</span>
                 {t.id === 'review' && (pendingReviewQuery.data?.items.length ?? 0) > 0 && (
                   <span className="allowance-tab-badge">
@@ -419,22 +420,15 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
           </div>
 
           <div className="allowance-form-group">
-            <label className="allowance-form-label">Approval State</label>
-            <select
-              className="allowance-select"
+            <SelectInput
+              label="Approval State"
               value={state}
+              options={approvalStateOptions}
               onChange={(e) => {
                 setState(e.target.value);
                 setPage(1);
               }}
-            >
-              <option value="">All States</option>
-              {approvalStateOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="allowance-form-group">
@@ -679,20 +673,12 @@ function AllowanceReview({ canDecide, canSettle }: { canDecide: boolean; canSett
                                         <span>HR Approval Decision</span>
                                       </span>
                                       <div className="allowance-form-group">
-                                        <label className="allowance-form-label">
-                                          Decision Outcome
-                                        </label>
-                                        <select
-                                          className="allowance-select"
+                                        <SelectInput
+                                          label="Decision Outcome"
                                           value={decision}
+                                          options={decisionOptions}
                                           onChange={(e) => setDecision(e.target.value)}
-                                        >
-                                          {decisionOptions.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>
-                                              {opt.label}
-                                            </option>
-                                          ))}
-                                        </select>
+                                        />
                                       </div>
                                       <div className="allowance-form-group">
                                         <label className="allowance-form-label">
@@ -1742,37 +1728,30 @@ function AllowancePolicies() {
                 <form onSubmit={(e) => void assignVersion(e)}>
                   <div className="policy-create-grid">
                     <div className="allowance-form-group">
-                      <label className="allowance-form-label">Published Version *</label>
-                      <select
-                        className="allowance-select"
+                      <SelectInput
+                        label="Published Version"
                         required
                         value={assignForm.policyVersionId}
+                        options={[
+                          { value: '', label: 'Choose published version' },
+                          ...(versions.data?.items ?? []).map((ver) => ({
+                            value: ver.id,
+                            label: `Version ${ver.number} (${ver.effectiveFrom})`,
+                          })),
+                        ]}
                         onChange={(e) =>
                           setAssignForm({ ...assignForm, policyVersionId: e.target.value })
                         }
-                      >
-                        <option value="">Choose published version</option>
-                        {(versions.data?.items ?? []).map((ver) => (
-                          <option key={ver.id} value={ver.id}>
-                            Version {ver.number} ({ver.effectiveFrom})
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div className="allowance-form-group">
-                      <label className="allowance-form-label">Target Population Scope</label>
-                      <select
-                        className="allowance-select"
+                      <SelectInput
+                        label="Target Population Scope"
                         value={assignForm.target}
+                        options={policyTargetOptions}
                         onChange={(e) => setAssignForm({ ...assignForm, target: e.target.value })}
-                      >
-                        {policyTargetOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div className="allowance-form-group">

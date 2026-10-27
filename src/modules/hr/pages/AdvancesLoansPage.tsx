@@ -157,7 +157,7 @@ export function AdvancesLoansPage() {
               className={`adv-tab-btn ${isActive ? 'active' : ''}`}
               onClick={() => setTab(item.id)}
             >
-              <Icon size={16} />
+              <Icon size={13} />
               <span>{item.label}</span>
             </button>
           );

@@ -1,8 +1,7 @@
 // Central Google Maps configuration & utilities for enterprise geolocation and tracking
 
 export const GOOGLE_MAPS_API_KEY: string =
-  (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) ||
-  'AIzaSyDVpMf1g9wbSUTF1I_jzRkMNrE-FbVMLF0';
+  (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) || '';
 
 // Official Google Maps Tile endpoints with 4 subdomains
 export const GOOGLE_MAPS_TILES = {
