@@ -25,12 +25,7 @@ import {
 } from '../../schemas/shifts';
 import { reason, rowVersion } from '../../schemas/common';
 import { businessToday } from '../../utils/messages';
-import {
-  emptySchedule,
-  nextDate,
-  validateSchedule,
-  weekdays,
-} from '../../utils/shift-schedule';
+import { emptySchedule, nextDate, validateSchedule, weekdays } from '../../utils/shift-schedule';
 
 function formatTime12(timeStr?: string): string {
   if (!timeStr) return '--:--';
@@ -55,8 +50,12 @@ export function ShiftMetadataForm({
 }) {
   const [source] = useState(shift);
   const [code, setCode] = useState(mode === 'create' && shift ? `${shift.code}-COPY` : '');
-  const [name, setName] = useState(mode === 'create' && shift ? `${shift.name} (Copy)` : source?.name ?? '');
-  const [inputReason, setReason] = useState(mode === 'create' && shift ? `Cloned from shift ${shift.code}` : '');
+  const [name, setName] = useState(
+    mode === 'create' && shift ? `${shift.name} (Copy)` : (source?.name ?? ''),
+  );
+  const [inputReason, setReason] = useState(
+    mode === 'create' && shift ? `Cloned from shift ${shift.code}` : '',
+  );
   const [validationError, setValidationError] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -71,10 +70,12 @@ export function ShiftMetadataForm({
     ) ?? '';
   const minimum = mode === 'schedule' ? nextDate(latest > today ? latest : today) : today;
 
-  // Initialize schedule with default working schedule
+  // A copied schedule retains its saved values; a new schedule requires HR input.
   const [schedule, setSchedule] = useState<ShiftSchedule>(() => {
     if (mode === 'create' && shift && shift.versions.length > 0) {
-      const sorted = [...shift.versions].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+      const sorted = [...shift.versions].sort((a, b) =>
+        b.effectiveFrom.localeCompare(a.effectiveFrom),
+      );
       const latestVer = sorted[0];
       if (latestVer) {
         return {
@@ -90,15 +91,7 @@ export function ShiftMetadataForm({
         };
       }
     }
-    const s = emptySchedule(minimum);
-    if (mode === 'create') {
-      s.startTime = '08:00:00';
-      s.endTime = '17:00:00';
-      s.scheduledMinutes = 540;
-      s.unpaidBreakMinutes = 60;
-      s.applicableWeekdays = 63; // Mon-Sat
-    }
-    return s;
+    return emptySchedule(minimum);
   });
 
   const title =
@@ -118,9 +111,10 @@ export function ShiftMetadataForm({
     const totalScheduled = schedule.scheduledMinutes || 0;
     const durationHours = (totalScheduled / 60).toFixed(1);
     const totalBreaks = (schedule.paidBreakMinutes || 0) + (schedule.unpaidBreakMinutes || 0);
-    const netWorkingHours = Math.max(0, (totalScheduled - (schedule.unpaidBreakMinutes || 0)) / 60).toFixed(1);
 
-    const activeDaysCount = weekdays.filter((d) => (schedule.applicableWeekdays & d.value) !== 0).length;
+    const activeDaysCount = weekdays.filter(
+      (d) => (schedule.applicableWeekdays & d.value) !== 0,
+    ).length;
 
     const isNight =
       (code && code.toUpperCase().includes('NGT')) ||
@@ -132,7 +126,6 @@ export function ShiftMetadataForm({
       endFormatted,
       durationHours,
       totalBreaks,
-      netWorkingHours,
       activeDaysCount,
       isNight,
     };
@@ -249,12 +242,7 @@ export function ShiftMetadataForm({
             <X size={15} />
             Cancel
           </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={handleSubmit}
-            disabled={action.pending}
-          >
+          <Button type="button" variant="primary" onClick={handleSubmit} disabled={action.pending}>
             {action.pending ? (
               <>
                 <RotateCcw size={15} className="animate-spin" />
@@ -273,7 +261,7 @@ export function ShiftMetadataForm({
       <div className="shift-editor-heading-wrap">
         <h1 className="shift-editor-main-title">{title}</h1>
         <p className="shift-editor-subtitle">
-          Configure operating hours, grace period thresholds, working days, and versioning for this work shift.
+          Configure operating hours, breaks, working days, and versioning for this work shift.
         </p>
       </div>
 
@@ -307,7 +295,10 @@ export function ShiftMetadataForm({
               >
                 <Building2 size={16} color="#2563eb" />
                 <span style={{ fontSize: '13.5px', color: '#1e293b' }}>
-                  Target Shift Record: <strong>{source.code} &ndash; {source.name}</strong>
+                  Target Shift Record:{' '}
+                  <strong>
+                    {source.code} &ndash; {source.name}
+                  </strong>
                 </span>
               </div>
             )}
@@ -321,7 +312,8 @@ export function ShiftMetadataForm({
                     Shift Identification
                   </h3>
                   <p className="shift-form-section-subtitle">
-                    Enter the unique corporate code and descriptive shift title for attendance assignment.
+                    Enter the unique corporate code and descriptive shift title for attendance
+                    assignment.
                   </p>
                 </div>
 
@@ -360,7 +352,8 @@ export function ShiftMetadataForm({
                     Operating Timings &amp; Baseline Hours
                   </h3>
                   <p className="shift-form-section-subtitle">
-                    Daily scheduled duty window, meal breaks, and effective start date in Asia/Karachi timezone.
+                    Daily scheduled duty window, meal breaks, and effective start date in
+                    Asia/Karachi timezone.
                   </p>
                 </div>
 
@@ -412,9 +405,7 @@ export function ShiftMetadataForm({
                     step={1}
                     required
                     value={schedule.endTime}
-                    onChange={(e) =>
-                      setSchedule((prev) => ({ ...prev, endTime: e.target.value }))
-                    }
+                    onChange={(e) => setSchedule((prev) => ({ ...prev, endTime: e.target.value }))}
                   />
                 </div>
 
@@ -506,7 +497,7 @@ export function ShiftMetadataForm({
                     Applicable Working Days
                   </h3>
                   <p className="shift-form-section-subtitle">
-                    Select scheduled duty days of the week. Biometric rules and attendance calculations will sync for these days.
+                    Select the weekdays on which this schedule applies.
                   </p>
                 </div>
 
@@ -537,12 +528,16 @@ export function ShiftMetadataForm({
             {/* Section 4: Deactivation Notice (if mode === 'status') */}
             {mode === 'status' && (
               <div className="shift-form-section">
-                <div className="shift-side-policy-box" style={{ background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}>
+                <div
+                  className="shift-side-policy-box"
+                  style={{ background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}
+                >
                   <Info size={18} style={{ color: '#d97706', flexShrink: 0 }} />
                   <div>
                     <strong>Lifecycle Status Warning:</strong>
                     <p style={{ margin: '4px 0 0' }}>
-                      Current or future roster assignments may prevent deactivating this shift. Historical schedule versions will be retained for audit consistency.
+                      Current or future roster assignments may prevent deactivating this shift.
+                      Historical schedule versions will be retained for audit consistency.
                     </p>
                   </div>
                 </div>
@@ -557,7 +552,8 @@ export function ShiftMetadataForm({
                   Audit Reason &amp; Authorization
                 </h3>
                 <p className="shift-form-section-subtitle">
-                  Required corporate audit log entry explaining why this work shift schedule is being established or modified.
+                  Required corporate audit log entry explaining why this work shift schedule is
+                  being established or modified.
                 </p>
               </div>
 
@@ -591,11 +587,7 @@ export function ShiftMetadataForm({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={action.pending}
-              >
+              <Button type="submit" variant="primary" disabled={action.pending}>
                 {action.pending ? (
                   <>
                     <RotateCcw size={15} className="animate-spin" />
@@ -625,7 +617,11 @@ export function ShiftMetadataForm({
                   {code.trim() || source?.code || 'SH-CODE'}
                 </span>
                 <span className="shift-preview-status">
-                  {mode === 'status' ? (source?.isActive ? 'To Deactivate' : 'To Activate') : 'Active'}
+                  {mode === 'status'
+                    ? source?.isActive
+                      ? 'To Deactivate'
+                      : 'To Activate'
+                    : 'Active'}
                 </span>
               </div>
 
@@ -660,8 +656,17 @@ export function ShiftMetadataForm({
               </div>
 
               {/* Working Days Mini Badges */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   Days Active:
                 </span>
                 <div style={{ display: 'flex', gap: '3px' }}>
@@ -701,17 +706,13 @@ export function ShiftMetadataForm({
                 </tr>
                 <tr>
                   <td>Duty Window</td>
-                  <td>
-                    {schedule.endDayOffset === 1 ? 'Overnight (Next Day)' : 'Same Day'}
-                  </td>
+                  <td>{schedule.endDayOffset === 1 ? 'Overnight (Next Day)' : 'Same Day'}</td>
                 </tr>
                 <tr>
                   <td>Total Scheduled</td>
-                  <td>{schedule.scheduledMinutes || 0} mins ({previewMetrics.durationHours}h)</td>
-                </tr>
-                <tr>
-                  <td>Net Working Time</td>
-                  <td>{previewMetrics.netWorkingHours}h (excl. unpaid)</td>
+                  <td>
+                    {schedule.scheduledMinutes || 0} mins ({previewMetrics.durationHours}h)
+                  </td>
                 </tr>
                 <tr>
                   <td>Meal / Breaks</td>
@@ -726,7 +727,7 @@ export function ShiftMetadataForm({
                   <td>
                     {schedule.missingCheckoutReminderAfterMinutes
                       ? `${schedule.missingCheckoutReminderAfterMinutes}m delay`
-                      : 'Default policy'}
+                      : 'Not specified'}
                   </td>
                 </tr>
               </tbody>
@@ -736,7 +737,8 @@ export function ShiftMetadataForm({
             <div className="shift-side-policy-box">
               <Info size={16} className="shift-side-policy-icon" />
               <span>
-                <strong>Immutable Audit Trail:</strong> Saved work shifts maintain permanent version histories. Past payroll and attendance evaluations will remain 100% compliant.
+                <strong>Schedule history:</strong> Saved schedules retain their effective dates and
+                version history. Review the timings and audit reason before saving.
               </span>
             </div>
           </aside>

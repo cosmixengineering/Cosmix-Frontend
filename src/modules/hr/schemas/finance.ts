@@ -394,7 +394,12 @@ export const payrollSkipped = z.object({
   sourceId: id.nullable(),
 });
 
-const salaryEmployeeTotal = z.object({ employeeId: id, grossEarnings: money, totalDeductions: money, netPay: money });
+const salaryEmployeeTotal = z.object({
+  employeeId: id,
+  grossEarnings: money,
+  totalDeductions: money,
+  netPay: money,
+});
 const salaryRunFields = {
   calculationVersion: text.optional(),
   salaryComplete: z.boolean().optional(),
@@ -416,11 +421,14 @@ export const payrollPreview = z.object({
 
 export const payrollBatch = z.object({
   ...salaryRunFields,
-  previewFingerprint: text.optional(),
-  frozenFingerprint: text.optional(),
+  previewFingerprint: text.nullable().optional(),
+  frozenFingerprint: text.nullable().optional(),
   hrApprovalRequestId: id.nullable().optional(),
   hrApprovedByUserId: text.nullable().optional(),
   hrApprovedAt: stamp.nullable().optional(),
+  returnApprovalRequestId: id.nullable().optional(),
+  returnedByUserId: text.nullable().optional(),
+  returnedAt: stamp.nullable().optional(),
   reviewState: text.optional(),
   id,
   batchReference: text,
