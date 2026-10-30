@@ -337,6 +337,12 @@ function ProfileReadNotice({
           ? 'was not found.'
           : 'is unavailable.'}
       </p>
+      {query.error instanceof ApiError && (
+        <p>
+          Code: {query.error.code || 'not supplied'}
+          {query.error.correlationId && ` · Reference: ${query.error.correlationId}`}
+        </p>
+      )}
       <ProfileQueryState query={query}>{null}</ProfileQueryState>
     </div>
   );
