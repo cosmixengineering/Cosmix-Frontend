@@ -436,13 +436,15 @@ export function FaceCameraRegistration({
               <span>LIVE</span>
             </div>
             <div className="bio-oval-guide-frame" aria-hidden="true" />
-            <div className="bio-oval-guide-text">Align face inside the oval</div>
+            <div className="bio-oval-guide-text">Keep your whole face in view</div>
           </>
         ) : (
           <div className="bio-camera-offline">
             <Camera size={38} aria-hidden="true" />
             <h4>Camera is off</h4>
-            <p>Face the camera in even lighting. Only one person should be visible.</p>
+            <p>
+              Face the light and hold the camera at eye level. Keep one person's whole face in view.
+            </p>
           </div>
         )}
       </div>

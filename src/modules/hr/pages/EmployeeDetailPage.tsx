@@ -1,3 +1,5 @@
+import { EmployeeReference } from '@/components/employees/EmployeeReference';
+import { formatEmployeeCode } from '@/utils/employee-code';
 import { useState, useEffect, type ComponentProps } from 'react';
 import { Link, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
@@ -25,23 +27,26 @@ import {
   User,
   Users,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { z } from 'zod';
 import { ApiError } from '@/services/api/api-error';
 import { Button } from '@/components/ui/Button';
 import { useHrAccess } from '../hooks/use-hr-access';
+import { useProfileRollover } from '../hooks/use-profile-rollover';
 import { useHrQuery } from '../hooks/use-hr-queries';
 import { id, pageOf, employeeSchema, type EmployeeSummary } from '../schemas/contracts';
 import { masterSchema } from '../schemas/organization';
 import {
   useEmployeeProfile,
+  transientProfileRead,
   employeeProfileEvidenceMessage,
   type EmployeeProfileValues,
 } from '../hooks/use-employee-profile';
 import { currentUpdateSchema, basicSchema, identitySchema } from '../schemas/updates';
 import { sections, type Section } from '../types/updates';
 import { labelDate } from '../utils/messages';
-import { formatCnic } from '../utils/identity';
+import { formatIdentityDocumentNumber } from '../utils/identity';
 import { Denied, QueryState } from '../components/Feedback';
 import { ChangeFormModal } from '../components/employee/ChangeForm';
 import { ChangeHistory } from '../components/employee/ChangeHistory';
@@ -56,9 +61,9 @@ import '@/styles/hr-dashboard.css';
 import { EmployeeBiometricSection } from '../components/employee/EmployeeBiometricSection';
 
 function calculateAge(dobStr?: string | null): string {
-  if (!dobStr) return '—';
+  if (!dobStr || dobStr === '0001-01-01') return '—';
   const birth = new Date(dobStr);
-  if (isNaN(birth.getTime())) return dobStr;
+  if (isNaN(birth.getTime()) || birth > new Date()) return '—';
   const now = new Date();
   let age = now.getFullYear() - birth.getFullYear();
   const m = now.getMonth() - birth.getMonth();
@@ -87,6 +92,7 @@ function EmployeeWorkspace({ employeeId }: { employeeId: string }) {
   const section = sections.find((s) => s.name === name);
 
   const canReadProfile = access.can('hr.employees.read');
+  useProfileRollover(employeeId, access.subject, canReadProfile);
   const details = useEmployeeProfile(employeeId);
 
   const deptsQuery = useHrQuery('departments?pageSize=100', pageOf(masterSchema), [
@@ -137,7 +143,17 @@ function EmployeeWorkspace({ employeeId }: { employeeId: string }) {
       {details.approved && (
         <>
           {access.can('hr.employees.identity.read') ? (
-            <ProfileReadNotice label="Current identity" query={details.identity} />
+            <>
+              <ProfileReadNotice label="Current identity" query={details.identity} />
+              {details.identity.data?.evidenceIssue && (
+                <p className="hr-message" role="status">
+                  Saved identity details are shown below. The original identity document evidence is
+                  unavailable for this record. Upload a replacement identity document, have it
+                  verified, then submit an explicit evidence repair request for independent Admin
+                  review. Original history is retained.
+                </p>
+              )}
+            </>
           ) : (
             <p className="muted">Identity details are restricted by your current permissions.</p>
           )}
@@ -266,6 +282,7 @@ function EmployeeWorkspace({ employeeId }: { employeeId: string }) {
                     key={name}
                     employeeId={employeeId}
                     edit={params.get('edit') === '1'}
+                    employeeName={employee?.name ?? undefined}
                   />
                 ) : name === 'lifecycle' ? (
                   <StatusWorkspace
@@ -327,23 +344,72 @@ function ProfileReadNotice({
   label: string;
   query: { isPending: boolean; isError: boolean; error: unknown; refetch: () => unknown };
 }) {
-  if (query.isPending) return <p role="status">Loading {label.toLowerCase()}…</p>;
+  if (query.isPending) return null;
   if (!query.isError) return null;
+
+  const code = query.error instanceof ApiError ? query.error.code : undefined;
+  const correlationId = query.error instanceof ApiError ? query.error.correlationId : undefined;
+
   return (
-    <div className="hr-notice" role="alert">
-      <p>
-        {label}{' '}
-        {query.error instanceof ApiError && query.error.status === 404
-          ? 'was not found.'
-          : 'is unavailable.'}
-      </p>
-      {query.error instanceof ApiError && (
-        <p>
-          Code: {query.error.code || 'not supplied'}
-          {query.error.correlationId && ` · Reference: ${query.error.correlationId}`}
-        </p>
-      )}
-      <ProfileQueryState query={query}>{null}</ProfileQueryState>
+    <div
+      role="alert"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
+        padding: '6px 12px',
+        background: '#fffbeb',
+        border: '1px solid #fef3c7',
+        borderLeft: '3px solid #d97706',
+        borderRadius: '4px',
+        margin: '4px 0 10px 0',
+        fontSize: '11px',
+        color: '#92400e',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          flex: 1,
+          minWidth: '220px',
+        }}
+      >
+        <AlertTriangle size={13} style={{ color: '#d97706', flexShrink: 0 }} />
+        <span>
+          <strong>{label} evidence notice:</strong> Record verification pending{' '}
+          {code && (
+            <code
+              style={{
+                fontSize: '10px',
+                background: 'rgba(217,119,6,0.1)',
+                padding: '1px 4px',
+                borderRadius: '3px',
+              }}
+            >
+              {code}
+            </code>
+          )}
+          {correlationId && <span style={{ opacity: 0.8 }}> &middot; Ref: {correlationId}</span>}
+        </span>
+      </div>
+      <Button
+        variant="secondary"
+        onClick={() => void query.refetch()}
+        style={{
+          height: '22px',
+          fontSize: '10.5px',
+          padding: '0 8px',
+          borderColor: '#fcd34d',
+          background: '#ffffff',
+          color: '#92400e',
+        }}
+      >
+        Check again
+      </Button>
     </div>
   );
 }
@@ -515,7 +581,7 @@ function EmployeeQuickRail({
             Current profile
           </span>
           {employee?.employeeNumber && (
-            <span className="emp-rail-badge">{employee.employeeNumber}</span>
+            <span className="emp-rail-badge">{formatEmployeeCode(employee.employeeNumber)}</span>
           )}
         </div>
         <div className="emp-rail-snapshot-box">
@@ -536,9 +602,14 @@ function EmployeeQuickRail({
           </div>
           {canIdentity && (
             <div className="emp-rail-snapshot-row">
-              <span className="emp-rail-snapshot-lbl">CNIC</span>
+              <span className="emp-rail-snapshot-lbl">
+                {profile?.identityDocumentType === 2 ? 'Passport' : 'Identity number'}
+              </span>
               <span className="emp-rail-snapshot-val">
-                {profile?.identityDocumentNumber ? formatCnic(profile.identityDocumentNumber) : '—'}
+                {formatIdentityDocumentNumber(
+                  profile?.identityDocumentNumber,
+                  profile?.identityDocumentType,
+                )}
               </span>
             </div>
           )}
@@ -916,9 +987,10 @@ function StructuredSectionDisplay({
               <div className="emp-kv-item">
                 <span className="emp-kv-label">CNIC / ID Document</span>
                 <span className="emp-kv-value">
-                  {profile?.identityDocumentNumber
-                    ? formatCnic(profile.identityDocumentNumber)
-                    : '—'}
+                  {formatIdentityDocumentNumber(
+                    profile?.identityDocumentNumber,
+                    profile?.identityDocumentType,
+                  )}
                 </span>
               </div>
             )}
@@ -1087,11 +1159,10 @@ function StructuredSectionDisplay({
           <div className="emp-kv-item">
             <span className="emp-kv-label">Document Number</span>
             <span className="emp-kv-value">
-              {identity?.identityDocumentNumber || profile?.identityDocumentNumber
-                ? formatCnic(
-                    identity?.identityDocumentNumber || profile?.identityDocumentNumber || '',
-                  )
-                : '—'}
+              {formatIdentityDocumentNumber(
+                identity?.identityDocumentNumber ?? profile?.identityDocumentNumber,
+                identity?.identityDocumentType ?? profile?.identityDocumentType,
+              )}
             </span>
           </div>
           <div className="emp-kv-item">
@@ -1277,23 +1348,14 @@ function StructuredSectionDisplay({
                     {manager.name}
                   </Link>
                   <span className="emp-code-chip" title="Employee Number">
-                    EMP-{String(manager.employeeNumber).padStart(4, '0')}
-                  </span>
-                  <span className="emp-short-id-chip" title={`Manager UUID: ${manager.id}`}>
-                    {manager.id.slice(0, 8)}
+                    {formatEmployeeCode(manager.employeeNumber)}
                   </span>
                 </div>
               ) : empData.reportingManagerEmployeeId ? (
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}
                 >
-                  <span>Manager #{empData.reportingManagerEmployeeId.slice(0, 8)}</span>
-                  <span
-                    className="emp-short-id-chip"
-                    title={`Full UUID: ${empData.reportingManagerEmployeeId}`}
-                  >
-                    {empData.reportingManagerEmployeeId.slice(0, 8)}
-                  </span>
+                  <EmployeeReference employeeId={empData.reportingManagerEmployeeId} showName />
                 </div>
               ) : (
                 <span className="muted" style={{ fontStyle: 'italic', fontWeight: 500 }}>
@@ -1460,11 +1522,18 @@ function StructuredSectionDisplay({
           <div className="emp-kv-item" key={key}>
             <span className="emp-kv-label">{key.replace(/([a-z0-9])([A-Z])/g, '$1 $2')}</span>
             <span className="emp-kv-value">
-              {val === null || val === undefined || val === ''
-                ? '—'
-                : typeof val === 'object'
-                  ? JSON.stringify(val)
-                  : String(val)}
+              {val === null || val === undefined || val === '' ? (
+                '—'
+              ) : key === 'employeeId' && typeof val === 'string' ? (
+                <EmployeeReference employeeId={val} />
+              ) : key === 'employeeNumber' &&
+                (typeof val === 'number' || typeof val === 'string') ? (
+                formatEmployeeCode(val)
+              ) : typeof val === 'object' ? (
+                JSON.stringify(val)
+              ) : (
+                String(val)
+              )}
             </span>
           </div>
         ))}
@@ -1492,7 +1561,7 @@ function CurrentSection({
   const [params, setParams] = useSearchParams();
   const [revision, setRevision] = useState(0);
   const [historyRevision, setHistoryRevision] = useState(0);
-  const [saved, setSaved] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(edit);
 
   useEffect(() => {
@@ -1521,24 +1590,42 @@ function CurrentSection({
   const query = currentQuery ?? sectionQuery;
   const canWrite = access.can(...section.read, ...section.write);
 
-  const deptsQuery = useHrQuery('departments?pageSize=100', pageOf(masterSchema), [
-    'hr.organization.read',
-  ]);
-  const desigsQuery = useHrQuery('designations?pageSize=100', pageOf(masterSchema), [
-    'hr.organization.read',
-  ]);
-  const branchesQuery = useHrQuery('branches?pageSize=100', pageOf(masterSchema), [
-    'hr.organization.read',
-  ]);
-  const staffCatsQuery = useHrQuery('staff-categories?pageSize=100', pageOf(masterSchema), [
-    'hr.organization.read',
-  ]);
-  const empTypesQuery = useHrQuery('employment-types?pageSize=100', pageOf(masterSchema), [
-    'hr.organization.read',
-  ]);
-  const employeesQuery = useHrQuery('employees?pageSize=100', pageOf(employeeSchema), [
-    'hr.employees.read',
-  ]);
+  const deptsQuery = useHrQuery(
+    'departments?pageSize=100',
+    pageOf(masterSchema),
+    ['hr.organization.read'],
+    section.name === 'employment',
+  );
+  const desigsQuery = useHrQuery(
+    'designations?pageSize=100',
+    pageOf(masterSchema),
+    ['hr.organization.read'],
+    section.name === 'employment',
+  );
+  const branchesQuery = useHrQuery(
+    'branches?pageSize=100',
+    pageOf(masterSchema),
+    ['hr.organization.read'],
+    section.name === 'employment',
+  );
+  const staffCatsQuery = useHrQuery(
+    'staff-categories?pageSize=100',
+    pageOf(masterSchema),
+    ['hr.organization.read'],
+    section.name === 'employment',
+  );
+  const empTypesQuery = useHrQuery(
+    'employment-types?pageSize=100',
+    pageOf(masterSchema),
+    ['hr.organization.read'],
+    section.name === 'employment',
+  );
+  const employeesQuery = useHrQuery(
+    'employees?pageSize=100',
+    pageOf(employeeSchema),
+    ['hr.employees.read'],
+    section.name === 'employment',
+  );
 
   return (
     <div className="emp-section-wrapper">
@@ -1585,9 +1672,10 @@ function CurrentSection({
           Reload
         </Button>
       </div>
-      {saved && (
+      {submitted && (
         <p role="status" className="hr-message" style={{ margin: '0 0 8px 0', fontSize: '11.5px' }}>
-          Saved successfully.
+          Change request submitted for Admin review. Current details remain unchanged until
+          approval.
         </p>
       )}
       <ProfileQueryState query={query}>
@@ -1603,7 +1691,13 @@ function CurrentSection({
               staffCategories={staffCatsQuery.data?.items}
               employmentTypes={empTypesQuery.data?.items}
               employees={employeesQuery.data?.items}
-              canWrite={canWrite && !query.data.scheduled}
+              canWrite={
+                canWrite &&
+                !query.data.scheduled &&
+                (!query.data.evidenceIssue ||
+                  (section.name === 'identity' &&
+                    query.data.evidenceIssue === 'identity_document_evidence_unavailable'))
+              }
               onEdit={handleOpenModal}
             />
 
@@ -1657,42 +1751,51 @@ function CurrentSection({
                 />
               </div>
             )}
-
-            {canWrite && query.data && (
-              <ChangeFormModal
-                key={`${query.data.version}-${revision}`}
-                open={isEditModalOpen}
-                onClose={handleCloseModal}
-                current={query.data}
-                section={section}
-                onSaved={() => {
-                  onSaved();
-                  setSaved(true);
-                  setRevision((r) => r + 1);
-                  void query.refetch();
-                }}
-              />
-            )}
           </>
         )}
       </ProfileQueryState>
+      {isEditModalOpen &&
+        canWrite &&
+        query.data &&
+        (query.isSuccess || transientProfileRead(query.error)) &&
+        (!query.data.evidenceIssue ||
+          (section.name === 'identity' &&
+            query.data.evidenceIssue === 'identity_document_evidence_unavailable')) && (
+          <ChangeFormModal
+            key={
+              section.name === 'bank' || section.name === 'employment'
+                ? access.subject
+                : access.subject + query.data.version
+            }
+            open={isEditModalOpen}
+            onClose={handleCloseModal}
+            current={query.data}
+            readPending={!query.isSuccess || query.isFetching}
+            section={section}
+            onSaved={() => {
+              onSaved();
+              setSubmitted(true);
+              setRevision((r) => r + 1);
+              void query.refetch();
+            }}
+          />
+        )}
       <ChangeHistory
         key={`history-${revision}-${historyRevision}`}
         employeeId={employeeId}
         section={section}
       />
-      {section.name !== 'basic' && (
-        <ChangeRequests
-          key={`requests-${revision}`}
-          employeeId={employeeId}
-          section={section}
-          onDecided={() => {
-            onSaved();
-            void query.refetch();
-            setHistoryRevision((v) => v + 1);
-          }}
-        />
-      )}
+      <ChangeRequests
+        key={`requests-${revision}`}
+        employeeId={employeeId}
+        section={section}
+        onDecided={() => {
+          setSubmitted(false);
+          onSaved();
+          void query.refetch();
+          setHistoryRevision((v) => v + 1);
+        }}
+      />
     </div>
   );
 }

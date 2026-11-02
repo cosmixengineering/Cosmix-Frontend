@@ -1,3 +1,5 @@
+import { EmployeeReference, EmployeePicker } from '@/components/employees/EmployeeReference';
+import { formatEmployeeCode } from '@/utils/employee-code';
 import { useState, useMemo, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import { z } from 'zod';
@@ -27,7 +29,16 @@ import {
   correctionSource,
   cursorPage,
 } from './contracts';
-import { canSelf, queueScopes, supportedScopes, type Scope } from './access';
+import {
+  canEmployee,
+  canSelf,
+  queueScopes,
+  scopeKey,
+  scopeNames,
+  supportedScopes,
+  type Scope,
+} from './access';
+import { employeeLookupSource } from '@/components/employees/employee-lookup-access';
 import { today, nextDate } from './helpers';
 import { PrivateWorkspace, QueryState } from '../../components/SchedulingUi';
 import '@/styles/attendance-corrections.css';
@@ -54,7 +65,11 @@ export function AttendanceCorrectionsHub({
   const [selectedRequest, setSelectedRequest] = useState<{ id: string; employeeId: string } | null>(
     null,
   );
-  const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
+  const [stateFilter, setStateFilter] = useState<number | 'all'>(
+    self || routeEmployeeId ? 'all' : 0,
+  );
+  const [selectedScope, setSelectedScope] = useState('');
+  const [continuation, setContinuation] = useState<{ key: string; cursor: string } | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
@@ -66,17 +81,21 @@ export function AttendanceCorrectionsHub({
   // Scopes & Permissions
   const canSubmit = self
     ? canSelf(access.user, 'attendance.corrections.self')
-    : access.can('attendance.corrections.submit');
-  const canReview = access.can('attendance.corrections.review');
+    : supportedScopes(access.user, 'attendance.corrections.submit').length > 0;
   const availableScopes = supportedScopes(access.user, 'attendance.corrections.review');
+  const canReview = availableScopes.length > 0;
   const effectiveScope: Scope | undefined =
-    availableScopes.find((s) => s.kind === 7) ?? availableScopes[0];
+    availableScopes.find((s) => scopeKey(s) === selectedScope) ??
+    availableScopes.find((s) => s.kind === 7) ??
+    availableScopes[0];
+  const directorySource = employeeLookupSource(access.user);
 
   // Employee Directory mapping for Name & EMP-ID resolution
   const employeesQuery = useAttendanceQuery(
-    '/hr/employees' + queryString({ page: 1, pageSize: 100 }),
+    (directorySource === 'hr' ? '/hr/employees' : '/attendance/employee-lookup') +
+      queryString({ page: 1, pageSize: 100 }),
     employeeChoices,
-    access.can('hr.employees.read'),
+    directorySource !== null,
   );
 
   const employeeMap = useMemo(() => {
@@ -91,7 +110,7 @@ export function AttendanceCorrectionsHub({
         .slice(0, 2)
         .join('');
       const empNum = emp.employeeNumber;
-      const code = empNum ? `EMP-${String(empNum).padStart(4, '0')}` : 'EMP';
+      const code = formatEmployeeCode(empNum);
       map.set(emp.id.toLowerCase(), {
         name,
         code,
@@ -121,11 +140,15 @@ export function AttendanceCorrectionsHub({
       : {}),
   };
 
+  const filterKey = JSON.stringify({ queuePath, ...queryParams });
+  const cursor = continuation?.key === filterKey ? continuation.cursor : undefined;
   const requestsQuery = useAttendanceQuery(
-    queuePath + queryString(queryParams),
+    queuePath + queryString({ ...queryParams, cursor }),
     self ? pageOf(correction) : cursorPage(correction),
-    canReview || canSubmit,
+    self ? canSubmit : routeEmployeeId ? canSubmit : canReview && Boolean(effectiveScope),
   );
+  const nextCursor =
+    requestsQuery.data && 'nextCursor' in requestsQuery.data ? requestsQuery.data.nextCursor : null;
 
   const requestItems = useMemo(() => {
     if (!requestsQuery.data || requestsQuery.isError) return [];
@@ -145,7 +168,9 @@ export function AttendanceCorrectionsHub({
 
   // KPI Calculations
   const kpis = useMemo(() => {
-    const all = requestsQuery.data?.items ?? [];
+    if (!requestsQuery.isSuccess || requestsQuery.isFetching || requestsQuery.isError)
+      return { pending: '—', approved: '—', returned: '—', total: '—' };
+    const all = requestsQuery.data.items ?? [];
     const pending = all.filter((r) => r.state === 'Pending').length;
     const approved = all.filter((r) => r.state === 'Approved').length;
     const returned = all.filter((r) => r.state === 'Returned').length;
@@ -155,7 +180,12 @@ export function AttendanceCorrectionsHub({
       returned,
       total: all.length,
     };
-  }, [requestsQuery.data?.items]);
+  }, [
+    requestsQuery.data,
+    requestsQuery.isSuccess,
+    requestsQuery.isFetching,
+    requestsQuery.isError,
+  ]);
 
   function reloadAll() {
     void requestsQuery.refetch();
@@ -221,7 +251,7 @@ export function AttendanceCorrectionsHub({
               <Clock size={18} />
             </div>
             <div className="att-kpi-info">
-              <span className="att-kpi-label">Pending Review</span>
+              <span className="att-kpi-label">Pending on this page</span>
               <span className="att-kpi-value" style={{ color: '#d97706' }}>
                 {kpis.pending} Requests
               </span>
@@ -234,7 +264,7 @@ export function AttendanceCorrectionsHub({
               <CheckCircle2 size={18} />
             </div>
             <div className="att-kpi-info">
-              <span className="att-kpi-label">Approved Adjustments</span>
+              <span className="att-kpi-label">Approved on this page</span>
               <span className="att-kpi-value" style={{ color: '#059669' }}>
                 {kpis.approved} Completed
               </span>
@@ -247,7 +277,7 @@ export function AttendanceCorrectionsHub({
               <RotateCcw size={18} />
             </div>
             <div className="att-kpi-info">
-              <span className="att-kpi-label">Returned for Revision</span>
+              <span className="att-kpi-label">Returned on this page</span>
               <span className="att-kpi-value" style={{ color: '#2563eb' }}>
                 {kpis.returned} Returned
               </span>
@@ -284,16 +314,33 @@ export function AttendanceCorrectionsHub({
               </div>
             </div>
 
+            {!self && !routeEmployeeId && availableScopes.length > 1 && (
+              <label>
+                Review scope
+                <select
+                  value={effectiveScope ? scopeKey(effectiveScope) : ''}
+                  onChange={(event) => setSelectedScope(event.target.value)}
+                >
+                  {availableScopes.map((scope, index) => (
+                    <option key={scopeKey(scope)} value={scopeKey(scope)}>
+                      {scopeNames[scope.kind]} {index + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {/* Quick Filter Bar */}
             <div className="att-filter-bar">
               <div className="att-quick-states">
-                <button
-                  type="button"
-                  className={`att-state-btn ${stateFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setStateFilter('all')}
-                >
-                  All States
-                </button>
+                {(self || routeEmployeeId) && (
+                  <button
+                    type="button"
+                    className={`att-state-btn ${stateFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setStateFilter('all')}
+                  >
+                    All States
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`att-state-btn ${stateFilter === 0 ? 'active' : ''}`}
@@ -371,8 +418,7 @@ export function AttendanceCorrectionsHub({
                     {requestItems.map((row) => {
                       const emp = employeeMap.get(row.employeeId.toLowerCase());
                       const empName = emp?.name || (self ? 'My Account' : 'Staff Member');
-                      const empCode =
-                        emp?.code || (self ? 'Self' : `EMP-${row.employeeId.slice(0, 8)}`);
+                      const empCode = <EmployeeReference employeeId={row.employeeId} />;
                       const initials = emp?.initials || 'EM';
 
                       const kindLower = row.kind.toLowerCase();
@@ -476,6 +522,28 @@ export function AttendanceCorrectionsHub({
           </section>
         )}
 
+        {!self && activeTab === 'queue' && requestsQuery.isSuccess && !requestsQuery.isError && (
+          <div className="attendance-commands">
+            {cursor && (
+              <button
+                type="button"
+                disabled={requestsQuery.isFetching}
+                onClick={() => setContinuation(null)}
+              >
+                First page
+              </button>
+            )}
+            {nextCursor && (
+              <button
+                type="button"
+                disabled={requestsQuery.isFetching}
+                onClick={() => setContinuation({ key: filterKey, cursor: nextCursor })}
+              >
+                Next page
+              </button>
+            )}
+          </div>
+        )}
         {/* 4. Tab: New Attendance Correction Form */}
         {activeTab === 'new' && (
           <SubmitCorrectionWizard
@@ -498,6 +566,12 @@ export function AttendanceCorrectionsHub({
             employeeId={selectedRequest.employeeId}
             self={self}
             canReview={canReview}
+            canDecide={canEmployee(
+              access.user,
+              'attendance.corrections.decide',
+              selectedRequest.employeeId,
+              effectiveScope,
+            )}
             employeeMap={employeeMap}
             onClose={() => setSelectedRequest(null)}
             onUpdated={() => {
@@ -517,7 +591,6 @@ export function AttendanceCorrectionsHub({
 function SubmitCorrectionWizard({
   self,
   routeEmployeeId,
-  employeeMap,
   employees,
   onSuccess,
   onCancel,
@@ -623,31 +696,12 @@ function SubmitCorrectionWizard({
                 <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>
                   Staff Member
                 </label>
-                <select
+                <EmployeePicker
+                  label="Employee"
                   value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  style={{
-                    height: '32px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '5px',
-                    padding: '0 8px',
-                    fontSize: '12px',
-                  }}
-                >
-                  {employees.map((emp) => {
-                    const info = employeeMap.get(emp.id.toLowerCase());
-                    const label = info
-                      ? `${info.name} [${info.code}]`
-                      : emp.name
-                        ? `${emp.name} [EMP-${emp.employeeNumber || '0'}]`
-                        : emp.id;
-                    return (
-                      <option key={emp.id} value={emp.id}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
+                  onChange={setEmployeeId}
+                  required
+                />
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -933,6 +987,7 @@ function CorrectionDetailModal({
   employeeId,
   self,
   canReview,
+  canDecide,
   employeeMap,
   onClose,
   onUpdated,
@@ -941,6 +996,7 @@ function CorrectionDetailModal({
   employeeId: string;
   self: boolean;
   canReview: boolean;
+  canDecide: boolean;
   employeeMap: Map<string, { name: string; code: string; initials: string }>;
   onClose: () => void;
   onUpdated: () => void;
@@ -961,11 +1017,11 @@ function CorrectionDetailModal({
 
   const emp = employeeMap.get(employeeId.toLowerCase());
   const empName = emp?.name || (self ? 'My Account' : 'Staff Member');
-  const empCode = emp?.code || `EMP-${employeeId.slice(0, 8)}`;
+  const empCode = <EmployeeReference employeeId={employeeId} />;
 
   async function handleDecision(e: FormEvent) {
     e.preventDefault();
-    if (!req || !decisionReason.trim()) return;
+    if (!req || !canDecide || !decisionReason.trim()) return;
 
     const result = await action.run(
       `/attendance/employees/${employeeId}/corrections/${requestId}/decide`,
@@ -1107,7 +1163,7 @@ function CorrectionDetailModal({
               )}
 
               {/* Decision Section for Authorized Reviewer */}
-              {req.state === 'Pending' && canReview && (
+              {req.state === 'Pending' && canReview && canDecide && (
                 <form
                   onSubmit={(e) => void handleDecision(e)}
                   style={{

@@ -1,5 +1,7 @@
+import { formatEmployeeCode } from '@/utils/employee-code';
+import { EmployeeReference } from '@/components/employees/EmployeeReference';
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Ban,
   Clock,
@@ -49,6 +51,7 @@ export function WorkflowRequests({
   search?: string;
   onDecided?: () => void;
 }) {
+  const workspace = useLocation().pathname.startsWith('/admin/') ? '/admin' : '/hr';
   const [page, setPage] = useState(1);
   const [decisionGuard, setDecisionGuard] = useState<DecisionGuard>({
     dirty: false,
@@ -88,7 +91,9 @@ export function WorkflowRequests({
     return query.data.items.filter((r) => {
       const emp = employeeMap.get(r.employeeId.toLowerCase());
       const nameMatch = emp?.name?.toLowerCase().includes(term);
-      const codeMatch = emp?.employeeNumber?.toString().includes(term);
+      const codeMatch =
+        formatEmployeeCode(emp?.employeeNumber).toLowerCase().includes(term) ||
+        emp?.employeeNumber?.toString().includes(term);
       const idMatch = r.id.toLowerCase().includes(term);
       return nameMatch || codeMatch || idMatch;
     });
@@ -161,10 +166,12 @@ export function WorkflowRequests({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {items.map((r) => {
               const emp = employeeMap.get(r.employeeId.toLowerCase());
-              const empName = emp?.name || `Employee #${r.employeeId.slice(0, 8)}`;
-              const empCode = emp?.employeeNumber
-                ? `EMP-${String(emp.employeeNumber).padStart(4, '0')}`
-                : `ID-${r.employeeId.slice(0, 6)}`;
+              const empName =
+                emp?.name ||
+                (employeesQuery.isLoading ? 'Loading employee�' : 'Employee name unavailable');
+              const empCode = employeesQuery.isLoading ? null : (
+                <EmployeeReference employeeId={r.employeeId} employeeNumber={emp?.employeeNumber} />
+              );
               const initials = emp?.name
                 ? emp.name
                     .split(' ')
@@ -234,7 +241,7 @@ export function WorkflowRequests({
                     {!employeeId && (
                       <Link
                         className="hr-request-link-btn"
-                        to={`/hr/employees/${r.employeeId}?section=${kind}`}
+                        to={`${workspace}/employees/${r.employeeId}?section=${kind}`}
                         title="View employee profile"
                       >
                         <ExternalLink size={13} />
@@ -308,6 +315,7 @@ function WorkflowRequestDetail({
   onGuardChange: (guard: DecisionGuard) => void;
   onCorrectedRequest: () => void;
 }) {
+  const workspace = useLocation().pathname.startsWith('/admin/') ? '/admin' : '/hr';
   const access = useHrAccess();
   const action = useHrAction();
   const path = `employees/${employeeId}/${kind}/requests/${requestId}`;
@@ -479,7 +487,7 @@ function WorkflowRequestDetail({
           {query.data.request.state === 2 && access.can(`hr.employees.${kind}.request`) && (
             <Link
               className="button button--secondary"
-              to={`/hr/employees/${employeeId}?section=${kind}&edit=1`}
+              to={`${workspace}/employees/${employeeId}?section=${kind}&edit=1`}
               onClick={onCorrectedRequest}
             >
               New corrected request

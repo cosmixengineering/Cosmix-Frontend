@@ -1,4 +1,6 @@
+import { EmployeeReference } from '@/components/employees/EmployeeReference';
 import { useState } from 'react';
+import { z } from 'zod';
 import { useParams } from 'react-router-dom';
 import { ClipboardList, MessageSquare, Search, ShieldCheck, X } from 'lucide-react';
 import { TextInput } from '@/components/forms/TextInput';
@@ -7,8 +9,8 @@ import { useAttendanceAccess } from '../../hooks/use-attendance-access';
 import { useAttendanceQuery } from '../../hooks/use-attendance-query';
 import { queryString } from '../../api/attendance-api';
 import { Command, Denied, QueryState } from '../../components/SchedulingUi';
-import { id } from '../../schemas/common';
-import { fieldPermission } from './access';
+import { id, pageOf } from '../../schemas/common';
+import { canReadSiteReportQueue, fieldPermission } from './access';
 import {
   reportDetail,
   reportFilter,
@@ -17,7 +19,7 @@ import {
   reportsPage,
   returnedReview,
 } from './contracts';
-import { RecordFields, Reload, SiteWorkspace } from './FieldUi';
+import { RecordFields, Reload } from './FieldUi';
 import { EvidenceDownload } from './Evidence';
 import { ReportDecisionForm, ReportResponseForm } from './ReportForms';
 import { FieldWorkspace } from './FieldWorkspace';
@@ -293,7 +295,7 @@ function ReportsWorkspace({ siteId, own = false }: { siteId?: string; own?: bool
                           <tr key={r.id}>
                             <td>{r.receivedAtUtc}</td>
                             <td>
-                              {r.employeeId}
+                              <EmployeeReference employeeId={r.employeeId} />
                               <br />
                               {r.siteId}
                             </td>
@@ -351,5 +353,56 @@ export function MySiteReportsPage() {
   );
 }
 export function SiteReportQueuePage() {
-  return <SiteWorkspace>{(siteId) => <ReportsWorkspace siteId={siteId} />}</SiteWorkspace>;
+  return (
+    <FieldWorkspace>
+      <SiteQueueSelection />
+    </FieldWorkspace>
+  );
+}
+
+function SiteQueueSelection() {
+  const access = useAttendanceAccess();
+  const params = useParams();
+  const [selected, setSelected] = useState(params.siteId ?? '');
+  const [page, setPage] = useState(1);
+  const allowed = canReadSiteReportQueue(access.user);
+  const query = useAttendanceQuery(
+    '/site-reports/queue/sites' + queryString({ page, pageSize: 25 }),
+    pageOf(z.object({ siteId: id, code: z.string(), name: z.string(), isActive: z.boolean() })),
+    allowed && !selected,
+  );
+  if (!allowed)
+    return (
+      <Denied>Site report review requires a site-scoped or company-wide report permission.</Denied>
+    );
+  if (selected)
+    return (
+      <>
+        <Command icon={X} onClick={() => setSelected('')}>
+          Change site
+        </Command>
+        <ReportsWorkspace key={selected} siteId={selected} />
+      </>
+    );
+  return (
+    <section className="attendance-section">
+      <h1>Site report review</h1>
+      <p>Select an authorized site to review submitted reports.</p>
+      <QueryState query={query} />
+      {query.data && !query.isError && !query.isFetching && (
+        <>
+          <ul>
+            {query.data.items.map((site) => (
+              <li key={site.siteId}>
+                <Command icon={ClipboardList} onClick={() => setSelected(site.siteId)}>
+                  {site.code} · {site.name}
+                </Command>
+              </li>
+            ))}
+          </ul>
+          <Pagination page={page} pageSize={25} total={query.data.totalCount} onChange={setPage} />
+        </>
+      )}
+    </section>
+  );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, Mail, X } from 'lucide-react';
 import { Pagination } from '@/components/data-display/Pagination';
 import { useAttendanceAccess } from '../../hooks/use-attendance-access';
@@ -17,9 +18,11 @@ import { FieldWorkspace } from './FieldWorkspace';
 function NotificationDetail({
   notificationId,
   close,
+  onRead,
 }: {
   notificationId: string;
   close: () => void;
+  onRead: () => void;
 }) {
   const access = useAttendanceAccess();
   const path = `/me/notifications/${notificationId}`;
@@ -58,7 +61,10 @@ function NotificationDetail({
           {marking && (
             <MutationForm
               title="Mark own notification read"
-              onSaved={reload}
+              onSaved={() => {
+                onRead();
+                reload();
+              }}
               onCancel={reload}
               submitLabel="Mark read"
               build={() => ({
@@ -77,7 +83,7 @@ function NotificationDetail({
   );
 }
 
-function NotificationsWorkspace() {
+function NotificationsWorkspace({ onRead }: { onRead: () => void }) {
   const access = useAttendanceAccess();
   const [page, setPage] = useState(1),
     [unread, setUnread] = useState(false),
@@ -94,6 +100,7 @@ function NotificationsWorkspace() {
         <NotificationDetail
           key={selected}
           notificationId={selected}
+          onRead={onRead}
           close={() => {
             setSelected('');
             void query.refetch();
@@ -154,9 +161,12 @@ function NotificationsWorkspace() {
   );
 }
 export function MyNotificationsPage() {
+  const workspaceCache = useQueryClient();
   return (
     <FieldWorkspace>
-      <NotificationsWorkspace />
+      <NotificationsWorkspace
+        onRead={() => void workspaceCache.invalidateQueries({ queryKey: ['notifications'] })}
+      />
     </FieldWorkspace>
   );
 }

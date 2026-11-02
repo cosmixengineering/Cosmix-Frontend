@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Pencil, Save, Send, X } from 'lucide-react';
+import { Pencil, Send, X } from 'lucide-react';
 import { TextInput } from '@/components/forms/TextInput';
+import { useHrAccess } from '../../hooks/use-hr-access';
 import { useHrAction, useHrQuery } from '../../hooks/use-hr-queries';
 import { useDirtyForm } from '../../hooks/use-dirty-form';
 import { documentsSchema } from '../../schemas/hiring';
-import { writeResult } from '../../schemas/contracts';
+import { id, writeResult } from '../../schemas/contracts';
 import type { CurrentUpdate, Section, UpdateData } from '../../types/updates';
 import {
   AddressFields,
@@ -19,19 +20,24 @@ import {
   LongField,
 } from '../hiring/FormFields';
 import { ReferenceField } from '../ReferenceField';
-import { ActionMessage } from '../Feedback';
+import { ActionMessage, Denied } from '../Feedback';
 import { formatCnic } from '../../utils/identity';
+import { profileDraftChanged } from '../../utils/profile-draft';
+
+const changeRequestWriteResult = writeResult.extend({ changeRequestId: id });
 
 export function ChangeFormModal({
   open,
   onClose,
   current,
+  readPending,
   section,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   current: CurrentUpdate;
+  readPending?: boolean;
   section: Section;
   onSaved: () => void;
 }) {
@@ -56,12 +62,12 @@ export function ChangeFormModal({
               <div className="org-modal-titles">
                 <DialogPrimitive.Title className="org-modal-title">
                   {section.name === 'basic'
-                    ? 'Edit Personal Details'
+                    ? 'Propose Personal Details Change'
                     : `Propose Changes: ${section.label}`}
                 </DialogPrimitive.Title>
                 <p className="org-modal-desc">
                   {section.name === 'basic'
-                    ? 'Update employee addresses, contact, and emergency information'
+                    ? 'Submit addresses, contact, and emergency information for independent Admin approval'
                     : 'Submit an auditable change request for employee records'}
                 </p>
               </div>
@@ -78,6 +84,7 @@ export function ChangeFormModal({
 
           <ChangeForm
             current={current}
+            readPending={readPending}
             section={section}
             onSaved={() => {
               onSaved();
@@ -92,16 +99,24 @@ export function ChangeFormModal({
 }
 
 export function ChangeForm({
-  current,
+  current: latest,
+  readPending = false,
   section,
   onSaved,
   onCancel,
 }: {
   current: CurrentUpdate;
+  readPending?: boolean;
   section: Section;
   onSaved: () => void;
   onCancel?: () => void;
 }) {
+  const access = useHrAccess();
+  // An open proposal retains the record and concurrency token the editor saw.
+  const [opened] = useState(latest);
+  const rolloverSection = section.name === 'employment' || section.name === 'bank';
+  const current = rolloverSection ? opened : latest;
+  const stale = rolloverSection && profileDraftChanged(current, latest);
   const [data, setData] = useState<UpdateData>(() => ({
     [section.name]:
       current.current.data[section.name] ??
@@ -117,6 +132,10 @@ export function ChangeForm({
   const [reason, setReason] = useState<string | null>(null);
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [sent, setSent] = useState(false);
+  const repairsIdentityEvidence =
+    section.name === 'identity' &&
+    current.evidenceIssue === 'identity_document_evidence_unavailable';
+  const [repairAcknowledged, setRepairAcknowledged] = useState(false);
   const action = useHrAction();
   useDirtyForm(!sent && (JSON.stringify(data) !== baseline || !!reason || !!effectiveFrom));
   const documents = useHrQuery(
@@ -131,6 +150,7 @@ export function ChangeForm({
   );
   const set = <K extends keyof UpdateData>(key: K, value: UpdateData[K]) =>
     setData({ [key]: value });
+  if (!access.can('hr.employees.read', ...section.read, ...section.write)) return <Denied />;
   if (!data[section.name])
     return (
       <p role="alert" className="hr-message hr-message--error">
@@ -143,27 +163,31 @@ export function ChangeForm({
       className="org-modal-form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!reason?.trim()) return;
+        if (
+          action.pending ||
+          (rolloverSection && profileDraftChanged(current, latest)) ||
+          readPending ||
+          sent ||
+          !reason?.trim() ||
+          (repairsIdentityEvidence && !repairAcknowledged)
+        )
+          return;
         void (async () => {
-          const path =
-            section.name === 'basic'
-              ? `employees/${current.employeeId}/current/basic`
-              : `employees/${current.employeeId}/change-requests`;
-          const body =
-            section.name === 'basic'
-              ? { expectedVersion: current.version, data: data.basic, reason: reason.trim() }
-              : {
-                  section: section.number,
-                  expectedVersion: current.version,
-                  data,
-                  effectiveFrom: section.dated ? effectiveFrom : null,
-                  reason: reason.trim(),
-                };
+          const body = {
+            section: section.number,
+            expectedVersion: current.version,
+            data,
+            effectiveFrom: section.dated ? effectiveFrom : null,
+            reason: reason.trim(),
+            ...(section.name === 'identity'
+              ? { repairIdentityEvidence: repairsIdentityEvidence && repairAcknowledged }
+              : {}),
+          };
           const result = await action.run(
-            path,
+            `employees/${current.employeeId}/change-requests`,
             body,
-            section.name === 'basic' ? 'PUT' : 'POST',
-            writeResult,
+            'POST',
+            changeRequestWriteResult,
           );
           if (result) {
             setBaseline(JSON.stringify(data));
@@ -182,6 +206,19 @@ export function ChangeForm({
           className="org-modal-fieldset"
           style={{ border: 'none', padding: 0, margin: 0 }}
         >
+          {repairsIdentityEvidence && (
+            <label className="hr-message">
+              <input
+                type="checkbox"
+                required
+                checked={repairAcknowledged}
+                onChange={(e) => setRepairAcknowledged(e.target.checked)}
+              />{' '}
+              Request identity evidence repair. I acknowledge the old proof is unavailable. A
+              verified replacement document and independent Admin approval are required; the
+              original history will remain unchanged.
+            </label>
+          )}
           {data.basic && (
             <>
               <AddressFields
@@ -435,20 +472,23 @@ export function ChangeForm({
         <button
           type="submit"
           className="org-btn-submit"
-          disabled={!reason?.trim() || action.pending}
+          disabled={!reason?.trim() || action.pending || sent || stale || readPending}
         >
-          {section.name === 'basic' ? <Save size={15} /> : <Send size={15} />}
-          {section.name === 'basic' ? 'Save basic details' : 'Submit change request'}
+          <Send size={15} />
+          Submit change request
         </button>
       </div>
 
+      {stale && (
+        <p role="status">
+          The current record changed. Close and reopen this proposal to review the new values.
+        </p>
+      )}
       <ActionMessage
         action={{
           error: action.error,
           success: sent
-            ? section.name === 'basic'
-              ? 'Basic details saved.'
-              : 'Change request submitted. Current details remain unchanged until approval.'
+            ? 'Change request submitted for Admin review. Current details remain unchanged until approval.'
             : null,
         }}
       />

@@ -1,5 +1,7 @@
+import { formatEmployeeCode } from '@/utils/employee-code';
+import { EmployeeReference } from '@/components/employees/EmployeeReference';
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Ban,
   Clock,
@@ -50,6 +52,7 @@ export function ChangeRequests({
   search?: string;
   onDecided?: () => void;
 }) {
+  const workspace = useLocation().pathname.startsWith('/admin/') ? '/admin' : '/hr';
   const [page, setPage] = useState(1);
   const [decisionGuard, setDecisionGuard] = useState<DecisionGuard>({
     dirty: false,
@@ -87,7 +90,9 @@ export function ChangeRequests({
     return query.data.items.filter((r) => {
       const emp = employeeMap.get(r.employeeId.toLowerCase());
       const nameMatch = emp?.name?.toLowerCase().includes(term);
-      const codeMatch = emp?.employeeNumber?.toString().includes(term);
+      const codeMatch =
+        formatEmployeeCode(emp?.employeeNumber).toLowerCase().includes(term) ||
+        emp?.employeeNumber?.toString().includes(term);
       const idMatch = r.id.toLowerCase().includes(term);
       return nameMatch || codeMatch || idMatch;
     });
@@ -147,7 +152,7 @@ export function ChangeRequests({
     }
   };
 
-  if (employeeId && !items.length) {
+  if (employeeId && query.isSuccess && !items.length) {
     return (
       <div
         className="emp-card"
@@ -165,11 +170,11 @@ export function ChangeRequests({
             style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}
           >
             <FileText size={16} className="emp-card-title-icon" style={{ color: '#2563eb' }} />
-            <span>Pending {section.label.toLowerCase()} requests</span>
+            <span>{section.label} change requests</span>
           </div>
         </div>
         <p className="muted" style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-          No pending change requests for this employee.
+          No change requests match the selected filters for this employee.
         </p>
       </div>
     );
@@ -206,10 +211,12 @@ export function ChangeRequests({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {items.map((r) => {
               const emp = employeeMap.get(r.employeeId.toLowerCase());
-              const empName = emp?.name || `Employee #${r.employeeId.slice(0, 8)}`;
-              const empCode = emp?.employeeNumber
-                ? `EMP-${String(emp.employeeNumber).padStart(4, '0')}`
-                : `ID-${r.employeeId.slice(0, 6)}`;
+              const empName =
+                emp?.name ||
+                (employeesQuery.isLoading ? 'Loading employee�' : 'Employee name unavailable');
+              const empCode = employeesQuery.isLoading ? null : (
+                <EmployeeReference employeeId={r.employeeId} employeeNumber={emp?.employeeNumber} />
+              );
               const initials = emp?.name
                 ? emp.name
                     .split(' ')
@@ -270,7 +277,7 @@ export function ChangeRequests({
                     {!employeeId && (
                       <Link
                         className="hr-request-link-btn"
-                        to={`/hr/employees/${r.employeeId}?section=${section.name}`}
+                        to={`${workspace}/employees/${r.employeeId}?section=${section.name}`}
                         title="View employee profile"
                       >
                         <ExternalLink size={13} />
@@ -351,6 +358,7 @@ function ChangeRequestDetail({
   onCorrectedRequest: () => void;
   onClose: () => void;
 }) {
+  const workspace = useLocation().pathname.startsWith('/admin/') ? '/admin' : '/hr';
   const access = useHrAccess();
   const action = useHrAction();
   const path = `employees/${employeeId}/changes/${section.name}/requests/${requestId}`;
@@ -386,7 +394,7 @@ function ChangeRequestDetail({
         <div style={{ marginTop: '12px' }}>
           <Link
             className="button button--secondary"
-            to={`/hr/employees/${employeeId}?section=${section.name}&edit=1`}
+            to={`${workspace}/employees/${employeeId}?section=${section.name}&edit=1`}
             onClick={onCorrectedRequest}
           >
             New corrected request
@@ -431,18 +439,27 @@ function ChangeRequestDetail({
   return (
     <QueryState query={query}>
       {query.data && (
-        <ChangeRequestReviewViewer
-          request={query.data.request}
-          section={section}
-          employee={employee}
-          reason={query.data.reason}
-          effectiveFrom={query.data.effectiveFrom}
-          beforeData={query.data.before.data}
-          proposedData={query.data.proposed}
-          decisions={query.data.decisions}
-          decisionFormSlot={decisionFormSlot}
-          onClose={onClose}
-        />
+        <>
+          {query.data.repairsIdentityEvidence && (
+            <p role="status" className="hr-message">
+              Identity evidence repair: the original proof is unavailable. Review the replacement
+              document and proposed identity carefully. Approval records a new identity version; it
+              does not certify the old missing proof.
+            </p>
+          )}
+          <ChangeRequestReviewViewer
+            request={query.data.request}
+            section={section}
+            employee={employee}
+            reason={query.data.reason}
+            effectiveFrom={query.data.effectiveFrom}
+            beforeData={query.data.before.data}
+            proposedData={query.data.proposed}
+            decisions={query.data.decisions}
+            decisionFormSlot={decisionFormSlot}
+            onClose={onClose}
+          />
+        </>
       )}
     </QueryState>
   );

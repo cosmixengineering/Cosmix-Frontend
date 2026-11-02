@@ -15,6 +15,15 @@ export function formatCnic(raw: string): string {
   return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`;
 }
 
+/** Format CNICs only; passport identifiers may contain letters and must stay intact. */
+export function formatIdentityDocumentNumber(
+  raw: string | null | undefined,
+  type: number | null | undefined,
+): string {
+  if (!raw?.trim()) return '—';
+  return type === 1 ? formatCnic(raw) : raw;
+}
+
 export function validateCnic(raw: string | null | undefined): string | null {
   if (!raw || !raw.trim()) {
     return 'Identity document number is required.';

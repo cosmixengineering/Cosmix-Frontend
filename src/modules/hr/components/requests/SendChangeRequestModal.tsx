@@ -1,3 +1,4 @@
+import { formatEmployeeCode } from '@/utils/employee-code';
 import { useState, useMemo } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
@@ -11,6 +12,8 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
+import { useHrAccess } from '../../hooks/use-hr-access';
+import { Denied } from '../Feedback';
 import { useHrQuery } from '../../hooks/use-hr-queries';
 import { employeeSchema, pageOf } from '../../schemas/contracts';
 import { currentUpdateSchema } from '../../schemas/updates';
@@ -18,7 +21,7 @@ import { sections, type Section, type SectionName } from '../../types/updates';
 import { ChangeForm } from '../employee/ChangeForm';
 import '@/styles/hr-requests.css';
 
-const selectableSections = sections.filter((s) => s.name !== 'basic');
+const selectableSections = sections;
 
 export function SendChangeRequestModal({
   open,
@@ -31,8 +34,12 @@ export function SendChangeRequestModal({
   onClose: () => void;
   initialSection?: string;
   initialEmployeeId?: string;
-  onSuccess: () => void;
+  onSuccess: (section: SectionName) => void;
 }) {
+  const access = useHrAccess();
+  const allowedSections = selectableSections.filter((section) =>
+    access.can('hr.employees.read', ...section.read, ...section.write),
+  );
   const [selectedEmpId, setSelectedEmpId] = useState<string>(initialEmployeeId ?? '');
   const [selectedSectionName, setSelectedSectionName] = useState<SectionName>(
     (selectableSections.some((s) => s.name === initialSection)
@@ -40,17 +47,21 @@ export function SendChangeRequestModal({
       : 'identity') as SectionName,
   );
 
-  // Fetch active employees directory
+  // Current-value proposals require approved onboarding.
   const employeesQuery = useHrQuery(
-    'employees?pageSize=100&status=1',
+    'employees?pageSize=100&status=2',
     pageOf(employeeSchema),
     ['hr.employees.read'],
     open,
   );
 
   const activeSection = useMemo<Section>(() => {
-    return selectableSections.find((s) => s.name === selectedSectionName) ?? selectableSections[0]!;
-  }, [selectedSectionName]);
+    return (
+      allowedSections.find((s) => s.name === selectedSectionName) ??
+      allowedSections[0] ??
+      selectableSections[0]!
+    );
+  }, [selectedSectionName, allowedSections]);
 
   // Set default employee if not set yet
   const employees = employeesQuery.data?.items ?? [];
@@ -61,7 +72,11 @@ export function SendChangeRequestModal({
     `employees/${currentEmpId}/current/${activeSection.name}`,
     currentUpdateSchema,
     ['hr.employees.read', ...activeSection.read],
-    Boolean(open && currentEmpId && activeSection),
+    Boolean(
+      open &&
+      currentEmpId &&
+      access.can('hr.employees.read', ...activeSection.read, ...activeSection.write),
+    ),
   );
 
   const getSectionIcon = (name: string) => {
@@ -191,8 +206,7 @@ export function SendChangeRequestModal({
                 >
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.employeeNumber ? `[EMP-${emp.employeeNumber}] ` : ''}
-                      {emp.name || 'Unnamed Staff'}
+                      [{formatEmployeeCode(emp.employeeNumber)}]{emp.name || 'Unnamed Staff'}
                     </option>
                   ))}
                 </select>
@@ -213,8 +227,8 @@ export function SendChangeRequestModal({
                 2. Category:
               </label>
               <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                {selectableSections.map((sec) => {
-                  const isActive = sec.name === selectedSectionName;
+                {allowedSections.map((sec) => {
+                  const isActive = sec.name === activeSection.name;
                   return (
                     <button
                       key={sec.name}
@@ -247,7 +261,9 @@ export function SendChangeRequestModal({
 
           {/* Form Content Body */}
           <div style={{ padding: '0 18px 16px' }}>
-            {currentRecordQuery.isLoading ? (
+            {!access.can('hr.employees.read', ...activeSection.read, ...activeSection.write) ? (
+              <Denied />
+            ) : currentRecordQuery.isLoading ? (
               <div
                 style={{
                   padding: '36px 20px',
@@ -290,7 +306,7 @@ export function SendChangeRequestModal({
                 current={currentRecordQuery.data}
                 section={activeSection}
                 onSaved={() => {
-                  onSuccess();
+                  onSuccess(activeSection.name);
                   onClose();
                 }}
                 onCancel={onClose}

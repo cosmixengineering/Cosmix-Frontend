@@ -19,7 +19,7 @@ export function AdminApprovalsPage() {
           <ClipboardCheck size={16} /> Hiring &amp; onboarding
         </Link>
         {hasHrPermission(user, 'hr.employees.read') && (
-          <Link to="/hr/requests">
+          <Link to="/admin/approvals/employee-changes?type=basic&state=0">
             <Users size={16} /> Employee changes
           </Link>
         )}

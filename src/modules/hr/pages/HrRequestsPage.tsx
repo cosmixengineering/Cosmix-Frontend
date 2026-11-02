@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck,
   Briefcase,
@@ -34,17 +34,18 @@ export function HrRequestsPage() {
   const access = useHrAccess();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
+  const isAdmin = useLocation().pathname.startsWith('/admin/');
+  const workspace = isAdmin ? '/admin' : '/hr';
 
   const tab = params.get('type') ?? 'employment';
   const state = params.get('state') ?? '';
   const [searchTerm, setSearchTerm] = useState('');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
 
   const tabs = [
-    ...sections
-      .filter((s) => s.name !== 'basic' && access.can(...s.read))
-      .map((s) => ({ key: s.name, label: s.label })),
+    ...sections.filter((s) => access.can(...s.read)).map((s) => ({ key: s.name, label: s.label })),
     ...(access.can('hr.employees.compensation.read')
       ? [{ key: 'compensation', label: 'Salary' }]
       : []),
@@ -55,7 +56,7 @@ export function HrRequestsPage() {
 
   if (!access.can('hr.employees.read')) return <Denied />;
 
-  const section = sections.find((s) => s.name === tab && s.name !== 'basic');
+  const section = sections.find((s) => s.name === tab);
 
   const getTabIcon = (key: string) => {
     switch (key) {
@@ -93,9 +94,9 @@ export function HrRequestsPage() {
       {/* Page Header */}
       <div className="hr-requests-header">
         <div className="hr-requests-breadcrumb">
-          <Link to="/hr/dashboard">Dashboard</Link>
+          <Link to={workspace + '/dashboard'}>Dashboard</Link>
           <ChevronRight size={13} />
-          <span>Human Resources</span>
+          <span>{isAdmin ? 'Administration' : 'Human Resources'}</span>
           <ChevronRight size={13} />
           <span style={{ color: '#0f172a', fontWeight: 600 }}>Workflow Requests & Approvals</span>
         </div>
@@ -107,7 +108,9 @@ export function HrRequestsPage() {
             </div>
             <div>
               <div className="hr-requests-tagline">HR OPERATIONS &bull; APPROVALS ENGINE</div>
-              <h1 className="hr-requests-title">HR Requests & Approvals Queue</h1>
+              <h1 className="hr-requests-title">
+                {isAdmin ? 'Employee Requests & Approvals' : 'HR Requests & Approvals Queue'}
+              </h1>
               <p className="hr-requests-subtitle">
                 Review, audit and authorize employee record modifications, employment status
                 transitions, document submissions, and compensation adjustments.
@@ -310,7 +313,8 @@ export function HrRequestsPage() {
               kind="employees"
               value={null}
               onChange={(v) => {
-                if (v) void navigate(`/hr/employees/${v}?section=${encodeURIComponent(tab)}`);
+                if (v)
+                  void navigate(`${workspace}/employees/${v}?section=${encodeURIComponent(tab)}`);
               }}
             />
           </div>
@@ -331,6 +335,13 @@ export function HrRequestsPage() {
           )}
         </div>
       </div>
+
+      {submitted && (
+        <p role="status" className="hr-message">
+          Change request submitted for Admin review. Current details remain unchanged until
+          approval.
+        </p>
+      )}
 
       {/* Main Request Queue Body */}
       {!tabs.some((t) => t.key === tab) ? (
@@ -356,7 +367,15 @@ export function HrRequestsPage() {
         open={isSendModalOpen}
         onClose={() => setIsSendModalOpen(false)}
         initialSection={tab}
-        onSuccess={() => setRefreshKey((k) => k + 1)}
+        onSuccess={(sectionName) => {
+          setSubmitted(true);
+          setRefreshKey((k) => k + 1);
+          setSearchTerm('');
+          const next = new URLSearchParams(params);
+          next.set('type', sectionName);
+          next.set('state', '0');
+          setParams(next);
+        }}
       />
     </div>
   );

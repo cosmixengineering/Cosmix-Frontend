@@ -14,13 +14,15 @@ function monthStart(value: string) {
   return parseDate(value + '-01');
 }
 
+const businessCalendar = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Karachi',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 export function businessToday(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Karachi',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
+  const parts = businessCalendar.formatToParts(now);
   return ['year', 'month', 'day']
     .map((type) => parts.find((part) => part.type === type)!.value)
     .join('-');

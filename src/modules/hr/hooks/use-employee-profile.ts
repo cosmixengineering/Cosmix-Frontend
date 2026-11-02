@@ -6,6 +6,14 @@ import { ApiError } from '@/services/api/api-error';
 import { useHrAccess } from './use-hr-access';
 import { useHrQuery } from './use-hr-queries';
 
+export function transientProfileRead(error: unknown) {
+  return (
+    error instanceof TypeError ||
+    (error instanceof DOMException && error.name === 'TimeoutError') ||
+    (error instanceof ApiError && (error.status >= 500 || error.status === 429))
+  );
+}
+
 export type EmployeeProfileValues = Partial<Omit<Profile, 'identityDocumentType'>> & {
   identityDocumentType?: number | null;
 };

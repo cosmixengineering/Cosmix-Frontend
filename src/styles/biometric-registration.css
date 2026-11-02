@@ -583,11 +583,8 @@
 .bio-camera-container img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-}
-
-.bio-camera-container video {
-  transform: scaleX(-1);
+  /* Show the same complete frame, in the same orientation, that capture() submits. */
+  object-fit: contain;
 }
 
 .bio-camera-container .bioreg-hidden {

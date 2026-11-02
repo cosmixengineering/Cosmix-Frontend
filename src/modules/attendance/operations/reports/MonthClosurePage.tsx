@@ -1,3 +1,4 @@
+import { EmployeeReference } from '@/components/employees/EmployeeReference';
 import { useState } from 'react';
 import { z } from 'zod';
 import { Filter, LockKeyhole, RefreshCw } from 'lucide-react';
@@ -23,6 +24,8 @@ const setupIssues: Readonly<Record<string, string>> = {
     'No staff category policy is effective on this date. Review the approved policy dates.',
   employee_assignment_unavailable:
     'Employment assignment is missing for this date. Review the employee assignment and roster.',
+  attendance_summary_policy_mismatch:
+    'The saved attendance summary uses a different policy revision. Review the effective policy and recalculate this day before closing the month.',
   attendance_month_not_finished: 'This month has not ended yet; it cannot be finalized.',
 };
 
@@ -153,7 +156,13 @@ function MonthRecord({
                   {query.data.issues.map((issue, index) => (
                     <tr key={`${issue.code}:${issue.employeeId}:${issue.businessDate}:${index}`}>
                       <td>{setupIssues[issue.code] ?? issue.code}</td>
-                      <td>{issue.employeeId ?? 'Month-wide'}</td>
+                      <td>
+                        {issue.employeeId ? (
+                          <EmployeeReference employeeId={issue.employeeId} />
+                        ) : (
+                          'Month-wide'
+                        )}
+                      </td>
                       <td>{issue.businessDate ?? 'Period'}</td>
                     </tr>
                   ))}
@@ -218,7 +227,9 @@ function MonthRecord({
                   <tbody>
                     {detail.data.summaries.map((row) => (
                       <tr key={row.summaryId}>
-                        <td>{row.employeeId}</td>
+                        <td>
+                          <EmployeeReference employeeId={row.employeeId} />
+                        </td>
                         <td>{row.businessDate}</td>
                         <td>{row.summaryId}</td>
                         <td>{row.policyVersionId}</td>
@@ -243,7 +254,9 @@ function MonthRecord({
                   <tbody>
                     {detail.data.carryForwards.map((row) => (
                       <tr key={row.adjustmentId}>
-                        <td>{row.employeeId}</td>
+                        <td>
+                          <EmployeeReference employeeId={row.employeeId} />
+                        </td>
                         <td>{row.sourceBusinessDate}</td>
                         <td>{row.revision}</td>
                         <td>{row.targetMonthStart}</td>
@@ -267,7 +280,9 @@ function MonthRecord({
                   <tbody>
                     {(detail.data.payrollInputs ?? []).map((row) => (
                       <tr key={row.sourceRevisionId}>
-                        <td>{row.employeeId}</td>
+                        <td>
+                          <EmployeeReference employeeId={row.employeeId} />
+                        </td>
                         <td>
                           {row.sourceRevisionId} / {row.sourceRevision}
                         </td>

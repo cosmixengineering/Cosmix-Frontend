@@ -10,6 +10,17 @@ const sitePermissions = new Set([
 ]);
 const selfPermissions = new Set(['attendance.zones.self', 'attendance.site-reports.self']);
 
+export function canReadSiteReportQueue(user: SessionUser | null) {
+  return Boolean(
+    user?.account &&
+    user.grants.some(
+      (g) =>
+        g.permission === 'attendance.site-reports.read' &&
+        ((g.scopeKind === 7 && g.targetId === null) || (g.scopeKind === 5 && Boolean(g.targetId))),
+    ),
+  );
+}
+
 export function fieldPermission(
   user: SessionUser | null,
   permission: string,

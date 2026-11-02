@@ -1,5 +1,6 @@
 import type { SessionUser } from '@/auth/types';
 import { hasReportGrant } from './reports/access';
+import { canReadSiteReportQueue } from './field/access';
 
 function all(user: SessionUser | null, permission: string) {
   return Boolean(
@@ -152,7 +153,7 @@ export function attendanceOperationalNavigation(user: SessionUser | null) {
     {
       to: '/hr/attendance/site-reports',
       label: 'Site reports',
-      allowed: scoped(user, 'attendance.site-reports.read'),
+      allowed: canReadSiteReportQueue(user),
     },
     {
       to: '/hr/attendance/reports',

@@ -16,7 +16,7 @@ export const sections: {
     number: 1,
     label: 'Basic details',
     read: [],
-    write: ['hr.employees.basic.manage'],
+    write: ['hr.employees.changes.request', 'hr.employees.basic.manage'],
     dated: false,
   },
   {

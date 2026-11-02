@@ -1,3 +1,4 @@
+import { formatEmployeeCode } from '@/utils/employee-code';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, MoreHorizontal, Navigation, Pencil, Upload, User } from 'lucide-react';
@@ -197,7 +198,7 @@ export function EmployeeProfileHeader({
         <div className="emp-header-info">
           <h1 className="emp-header-name">{fullName}</h1>
           <div className="emp-badges-row">
-            {employeeNo && <span className="emp-badge-code">{employeeNo}</span>}
+            {employeeNo && <span className="emp-badge-code">{formatEmployeeCode(employeeNo)}</span>}
             {statusLabel && (
               <span className={`emp-badge-status ${statusIndex === 2 ? 'active' : 'inactive'}`}>
                 <span className="emp-badge-dot" />
@@ -219,12 +220,17 @@ export function EmployeeProfileHeader({
 
       {/* Right Action Buttons */}
       <div className="emp-header-actions">
-        {approved && access.can('hr.employees.read', 'hr.employees.basic.manage') && (
-          <Link to="?section=basic&edit=1" className="emp-btn-primary">
-            <Pencil size={12} />
-            Edit details
-          </Link>
-        )}
+        {approved &&
+          access.can(
+            'hr.employees.read',
+            'hr.employees.changes.request',
+            'hr.employees.basic.manage',
+          ) && (
+            <Link to="?section=basic&edit=1" className="emp-btn-primary">
+              <Pencil size={12} />
+              Propose changes
+            </Link>
+          )}
         {approved && (
           <Link to="?section=tracking" className="emp-btn-secondary">
             <Navigation size={12} />

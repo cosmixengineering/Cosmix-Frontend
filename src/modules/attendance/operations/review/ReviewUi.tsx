@@ -622,7 +622,8 @@ function EmployeeSelection({
             <div className="att-workspace-header-text">
               <h2 className="att-workspace-title">{title}</h2>
               <p className="att-workspace-subtitle">
-                Search or select an employee to view history, review duty hours, or record overtime requests.
+                Search or select an employee to view history, review duty hours, or record overtime
+                requests.
               </p>
             </div>
           </div>
@@ -692,9 +693,7 @@ function EmployeeSelection({
               <Users size={26} aria-hidden="true" />
             </div>
             <h2>Select an employee to manage records</h2>
-            <p>
-              Search by name or EMP code above to view or submit requests for that employee.
-            </p>
+            <p>Search by name or EMP code above to view or submit requests for that employee.</p>
           </section>
         </div>
       )}
@@ -906,7 +905,11 @@ export function RangeFilter({
             Filter history
           </Command>
         </div>
-        {!valid && <p role="alert" className="att-filter-error">Choose an exclusive range of 1 to 366 days.</p>}
+        {!valid && (
+          <p role="alert" className="att-filter-error">
+            Choose an exclusive range of 1 to 366 days.
+          </p>
+        )}
       </fieldset>
     </form>
   );
