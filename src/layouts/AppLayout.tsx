@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/auth/use-auth';
 import { canOpenWorkspace, workspaceHome, workspaceLabel } from '@/auth/workspace-access';
-import { attendanceOperationalNavigation, hasAttendancePermission } from '@/modules/attendance';
+import { hasAttendancePermission } from '@/modules/attendance';
 import { NotificationBellToggle } from '@/components/notifications/NotificationBellToggle';
 import { hrConfigurationNavigation } from '@/modules/hr/policy-navigation';
 import logo from '@/assets/images/cosmix-logo.png';
@@ -42,11 +42,6 @@ export function AppLayout() {
   const deskLabel = workspaceLabel(user);
   const canOpen = (path: string) => status === 'authenticated' && canOpenWorkspace(user, path);
   const configurationLinks = hrConfigurationNavigation(user, status).filter((link) => link.allowed);
-  // Evaluate each operational link against non-Self grants. One management grant
-  // must never promote unrelated personal grants into management navigation.
-  const operationalLinks = attendanceOperationalNavigation(
-    user ? { ...user, grants: user.grants.filter((grant) => grant.scopeKind !== 1) } : null,
-  ).filter((link) => status === 'authenticated' && link.allowed);
   const canTrackAttendance =
     status === 'authenticated' &&
     hasAttendancePermission(user, 'hr.employees.read') &&
@@ -343,7 +338,6 @@ export function AppLayout() {
   const visibleLinks: typeof navLinks = [
     ...navLinks.filter((link) => canOpen(link.to)),
     ...configurationLinks.map((link) => ({ ...link, icon: Settings })),
-    ...operationalLinks.map((link) => ({ ...link, icon: Clock })),
     { to: '/account', label: 'Account & Security', icon: Settings },
   ].filter((link, index, links) => links.findIndex((item) => item.to === link.to) === index);
 

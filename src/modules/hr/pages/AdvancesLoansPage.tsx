@@ -328,7 +328,7 @@ export function AdvanceRequests({
             { label: 'Pending Only', value: '0' },
             { label: 'All Statuses', value: '' },
             { label: 'Approved', value: '1' },
-            { label: 'Rejected', value: '2' },
+            { label: 'Rejected', value: '3' },
           ].map((chip) => (
             <button
               type="button"
@@ -451,7 +451,7 @@ export function AdvanceRequests({
                     reason: request.reason || 'No detailed reason provided.',
                     requestedOn: request.requestedOn,
                     createdAt: labelDate(request.createdAt),
-                    agreement: request.agreementId || 'Pending Approval',
+                    agreement: request.agreementId ?? (request.state === 'Pending' ? 'Pending Approval' : 'No agreement'),
                   }}
                 />
 
